@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Market Intelligence War Room</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              background: '#121212',
+              panel: '#1A1A1A',
+              'panel-border': '#333333',
+              'primary-text': '#EAEAEA',
+              accent: '#F8C91C',
+              'accent-hover': '#eab308',
+              secondary: '#27272a',
+              'secondary-hover': '#3f3f46',
+              disabled: 'rgba(234, 234, 234, 0.5)',
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+          }
+        }
+      }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.21.0",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.2",
+    "recharts": "https://aistudiocdn.com/recharts@^3.2.1",
+    "framer-motion": "https://aistudiocdn.com/framer-motion@^12.23.22"
+  }
+}
+</script>
+</head>
+<body class="bg-background text-primary-text">
+    <div id="root"></div>
+    <script type="text/babel" data-type="module" src="./index.tsx"></script>
+</body>
+</html>
