@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import { Mission, MissionStatus, User, UserRole } from '../../types';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Target, Users, Clock, Trophy, Zap, AlertCircle, Play, Eye, Crown, Shield, BarChart3, Calendar, ChevronRight, TrendingUp } from '../icons';
 import { db } from '../../lib/db';
 import { motion } from 'framer-motion';

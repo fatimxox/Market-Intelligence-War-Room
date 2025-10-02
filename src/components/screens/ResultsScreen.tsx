@@ -193,8 +193,8 @@ const ResultsScreen: React.FC = () => {
             setScoresFromDetails(finalScores, missionData, teamAlpha, teamBeta);
             
             if (missionData.status !== MissionStatus.COMPLETED) {
-                const alphaTotal = Object.values(finalScores.team_alpha_score).reduce((s, v) => typeof v === 'number' ? s + v : s, 0);
-                const betaTotal = Object.values(finalScores.team_beta_score).reduce((s, v) => typeof v === 'number' ? s + v : s, 0);
+                const alphaTotal = Object.values(finalScores.team_alpha_score).reduce((s: number, v) => typeof v === 'number' ? s + v : s, 0);
+                const betaTotal = Object.values(finalScores.team_beta_score).reduce((s: number, v) => typeof v === 'number' ? s + v : s, 0);
                 let finalWinner: 'alpha' | 'beta' | 'tie' = 'tie';
                 if (alphaTotal > betaTotal) finalWinner = 'alpha';
                 if (betaTotal > alphaTotal) finalWinner = 'beta';

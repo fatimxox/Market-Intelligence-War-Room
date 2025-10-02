@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { User, Team, Mission, PlayerAssignment } from '../../types';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
-import { Crown, Users, ChevronRight } from '../icons';
+import { Crown, ChevronRight } from '../icons';
 import { db } from '../../lib/db';
 
 const MissionLobbyScreen: React.FC = () => {

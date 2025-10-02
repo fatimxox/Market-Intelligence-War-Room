@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { IntelligenceData, User, Team, Mission, BattleRole, ChatMessage, Report, MissionStatus, PlayerAssignment } from '../../types';
 import { BATTLE_CONFIGS, initializeBattleData, ROLE_BATTLE_MAP, emptyFounder, emptyExecutive, emptyCompetitivePosition, emptyGeographicFootprint, emptyProductLine, emptyPricingChange, emptyPlatform, emptyInfluencerPartnership, emptyFundingRound, emptyInvestor, emptyB2CSegment, emptyB2BSegment, emptyPainPoint, emptyStrategicPartner, emptyKeySupplier, emptyExpansion, QUICK_TOOLS } from '../../constants';
-import { Send, Plus, XCircle, Save, MagicWandIcon, MessageCircleIcon, Clock, Loader } from '../icons';
+import { Send, Plus, XCircle, MagicWandIcon, MessageCircleIcon, Clock, Loader } from '../icons';
 import Input from '../ui/Input';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';

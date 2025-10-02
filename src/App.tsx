@@ -1,5 +1,3 @@
-
-import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginScreen from './components/screens/LoginScreen';
 import RegisterScreen from './components/screens/RegisterScreen';

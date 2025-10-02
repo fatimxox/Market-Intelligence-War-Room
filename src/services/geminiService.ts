@@ -3,11 +3,9 @@ import { GoogleGenAI } from "@google/genai";
 import { IntelligenceData, Mission, Team, AIScoreResult } from '../types';
 
 const getApiKey = () => {
-  // FIX: Use process.env.API_KEY as required by the guidelines.
-  const key = process.env.API_KEY;
+  const key = import.meta.env.VITE_API_KEY;
   if (!key) {
-    // FIX: Updated warning message to refer to the correct environment variable.
-    console.warn("API_KEY environment variable not set. AI features will not work.");
+    console.warn("VITE_API_KEY environment variable not set. AI features will not work.");
     return null;
   }
   return key;
@@ -115,7 +113,7 @@ Fill in the numeric scores and string reasoning based on your expert analysis. T
     });
 
     // FIX: Use the .text property to get the response text directly.
-    const jsonString = response.text.trim();
+    const jsonString = response.text?.trim() || '';
     const cleanedJson = jsonString.replace(/^```json\s*|```\s*$/g, '');
     return JSON.parse(cleanedJson) as AIScoreResult;
   } catch (error) {
@@ -148,7 +146,7 @@ export const fetchAiAssistedData = async (
     });
 
     // FIX: Use the .text property to get the response text directly.
-    return response.text.trim();
+    return response.text?.trim() || null;
   } catch (error) {
     console.error(`Error fetching AI-assisted data for ${fieldLabel}:`, error);
     return null;
