@@ -3,8 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { User, BattleRole, PlayerAssignment, Team, Mission } from '../../types.ts';
 import Card from '../ui/Card.tsx';
 import Button from '../ui/Button.tsx';
-import { ROLE_BATTLE_MAP, BATTLE_CONFIGS, ChevronRight } from '../../constants.tsx';
-import { db } from '../../db.ts';
+// FIX: Corrected constant and icon imports
+import { ROLE_BATTLE_MAP, BATTLE_CONFIGS } from '../../constants.tsx';
+import { ChevronRight } from '../../src/components/icons.tsx';
+// FIX: Corrected db import path
+import { db } from '../../src/lib/db.ts';
 
 interface PlayerCardProps {
     member: PlayerAssignment;
@@ -127,16 +130,17 @@ const StrategyRoomScreen: React.FC = () => {
 
     const BattleRoleSlot: React.FC<{ role: any }> = ({ role }) => {
         const assignedMember = roleAssignments[role.id as BattleRole];
+        const IconComponent = role.icon;
         return (
              <div
                 className={`bg-secondary p-6 rounded-xl transition-all duration-200 h-full flex flex-col ${dropTarget === role.id && isLeader ? 'bg-accent/20 ring-2 ring-accent' : ''}`}
                 onDragOver={(e) => { e.preventDefault(); if (isLeader) setDropTarget(role.id); }}
                 onDragLeave={() => setDropTarget(null)}
-                onDrop={() => handleDrop(role.id)}
+                onDrop={() => handleDrop(role.id as BattleRole)}
             >
                  <div className="text-center">
                     <div className={`w-16 h-16 mx-auto mb-4 rounded-lg flex items-center justify-center`}>
-                        <role.icon className={`w-8 h-8 ${BATTLE_CONFIGS[ROLE_BATTLE_MAP[role.id as BattleRole]].color}`} />
+                        <IconComponent className={`w-8 h-8 ${BATTLE_CONFIGS[ROLE_BATTLE_MAP[role.id as BattleRole]].color}`} />
                     </div>
                     <h3 className="text-lg font-bold">{role.name}</h3>
                     <p className="text-sm text-gray-400 mb-4">{role.description}</p>

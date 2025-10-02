@@ -3,8 +3,10 @@ import Card from '../ui/Card.tsx';
 import Input from '../ui/Input.tsx';
 import Button from '../ui/Button.tsx';
 import { User, UserRole } from '../../types.ts';
-import { Crown, UserCheck, Shield, Upload, Save, LogOut } from '../../constants.tsx';
-import { db } from '../../db.ts';
+// FIX: Corrected icon import path
+import { Crown, UserCheck, Shield, Upload, Save, LogOut } from '../../src/components/icons.tsx';
+// FIX: Corrected db import path
+import { db } from '../../src/lib/db.ts';
 import { useNavigate } from 'react-router-dom';
 
 const SettingsScreen: React.FC = () => {

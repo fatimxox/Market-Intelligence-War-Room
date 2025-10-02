@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { motion, Variants } from 'framer-motion';
 import Card from '../ui/Card.tsx';
 import Input from '../ui/Input.tsx';
 import Button from '../ui/Button.tsx';
-import { db } from '../../db.ts';
+// FIX: Corrected db import path
+import { db } from '../../src/lib/db.ts';
+// FIX: Corrected icon import path
+import { MailIcon, Lock, Target } from '../../src/components/icons.tsx';
 
 const LoginScreen: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -35,43 +39,102 @@ const LoginScreen: React.FC = () => {
         navigate('/dashboard');
     };
 
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-background p-4">
-            <Card className="w-full max-w-md p-8">
-                <h1 className="text-3xl font-bold text-center text-accent mb-2">Intel Wars</h1>
-                <p className="text-center text-gray-400 mb-8">Welcome, Agent. Please authenticate.</p>
+    const formVariants = {
+      hidden: { opacity: 0 },
+      visible: {
+        opacity: 1,
+        transition: {
+          staggerChildren: 0.15,
+          delayChildren: 0.2,
+        },
+      },
+    };
 
-                <form onSubmit={handleLogin} className="space-y-6">
-                    <Input
-                        id="email"
-                        label="Email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="e.g., ateffatim@gmail.com"
-                        required
-                    />
-                    <Input
-                        id="password"
-                        label="Password"
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="e.g., password123"
-                        required
-                    />
-                    {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-                    <Button type="submit" variant="primary" className="w-full !mt-8">
-                        Login
-                    </Button>
-                </form>
-                <p className="text-center mt-6 text-sm">
-                    Don't have an account?{' '}
-                    <Link to="/register" className="font-semibold text-accent hover:underline">
-                        Register here
-                    </Link>
-                </p>
-            </Card>
+    const itemVariants: Variants = {
+      hidden: { y: 20, opacity: 0 },
+      visible: { y: 0, opacity: 1, transition: { type: 'spring', stiffness: 100 } },
+    };
+
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-background p-4 overflow-hidden">
+            <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5, type: 'spring' }}
+            >
+              <Card className="w-full max-w-md p-8 border animate-glow-border">
+                  <motion.div 
+                    className="text-center mb-8"
+                    initial={{ y: -20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.1, type: 'spring' }}
+                  >
+                    <div className="w-16 h-16 bg-accent/10 rounded-full mx-auto flex items-center justify-center mb-4 border-2 border-accent/30">
+                      <Target className="w-8 h-8 text-accent animate-glow" />
+                    </div>
+                    <h1 className="text-3xl font-bold text-accent">Agent Authentication</h1>
+                    <p className="text-gray-400 mt-2">Access the Intel Wars Hub.</p>
+                  </motion.div>
+                  
+                  <motion.form 
+                    onSubmit={handleLogin} 
+                    className="space-y-6"
+                    variants={formVariants}
+                    initial="hidden"
+                    animate="visible"
+                  >
+                      <motion.div variants={itemVariants}>
+                        <Input
+                            id="email"
+                            label="Email"
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="agent@intel.com"
+                            required
+                            icon={<MailIcon className="w-5 h-5" />}
+                        />
+                      </motion.div>
+                      <motion.div variants={itemVariants}>
+                        <Input
+                            id="password"
+                            label="Password"
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="••••••••"
+                            required
+                            icon={<Lock className="w-5 h-5" />}
+                        />
+                      </motion.div>
+
+                      {error && <p className="text-danger text-sm text-center !mt-4">{error}</p>}
+                      
+                      <motion.div variants={itemVariants}>
+                        <div className="w-full !mt-8">
+                            <Button 
+                              type="submit" 
+                              variant="primary" 
+                              className="w-full"
+                            >
+                                Authenticate & Enter Hub
+                            </Button>
+                        </div>
+                      </motion.div>
+                  </motion.form>
+                  <motion.p 
+                    className="text-center mt-6 text-sm"
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 1 }}
+                  >
+                      Need an operative profile?{' '}
+                      <Link to="/register" className="font-semibold text-accent hover:underline">
+                          Enlist Here
+                      </Link>
+                  </motion.p>
+              </Card>
+            </motion.div>
         </div>
     );
 };

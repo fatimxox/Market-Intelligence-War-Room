@@ -14,6 +14,7 @@ import RulesAndRolesScreen from './components/screens/RulesAndRolesScreen.tsx';
 import ProtectedRoute from './components/ProtectedRoute.tsx';
 import Layout from './components/layout/Layout.tsx';
 import { UserRole } from './types.ts';
+import MissionLobbyScreen from './components/screens/MissionLobbyScreen.tsx';
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
         <Route element={<Layout />}>
           <Route element={<ProtectedRoute />}>
               <Route path="/dashboard" element={<DashboardScreen />} />
+              <Route path="/lobby/:missionId" element={<MissionLobbyScreen />} />
               <Route path="/strategy/:missionId/:teamName" element={<StrategyRoomScreen />} />
               <Route path="/war-room/:missionId/:teamName" element={<WarRoomScreen />} />
               <Route path="/mission-results/:missionId" element={<ResultsScreen />} />

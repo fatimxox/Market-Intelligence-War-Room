@@ -1,5 +1,5 @@
 import { MOCK_DB } from './constants.tsx';
-import { User, Mission, Team, PendingPlayer } from './types.ts';
+import { User, Mission, Team, Report, MissionStatus } from './types.ts';
 
 const DB_KEY = 'intel_wars_db';
 
@@ -10,7 +10,8 @@ const getDb = () => {
   }
   // Initialize if not present and set mock passwords for login
   const initialDb = { ...MOCK_DB };
-  initialDb.users.forEach((user: User) => { user.password = 'password123'; });
+  // FIX: Remove explicit type annotation to avoid type mismatch on inferred object from MOCK_DB
+  initialDb.users.forEach((user) => { user.password = 'password123'; });
   localStorage.setItem(DB_KEY, JSON.stringify(initialDb));
   return initialDb;
 };
@@ -22,9 +23,28 @@ const saveDb = (db: any) => {
 export const db = {
   // READ
   getUsers: (): User[] => getDb().users,
-  getMissions: (): Mission[] => getDb().missions,
+  getMissions: (): Mission[] => {
+    const currentDb = getDb();
+    const now = new Date();
+    let missionsUpdated = false;
+
+    const updatedMissions = currentDb.missions.map((mission: Mission) => {
+      if (mission.status === MissionStatus.SCHEDULED && mission.mission_start_time && new Date(mission.mission_start_time) <= now) {
+        missionsUpdated = true;
+        return { ...mission, status: MissionStatus.RECRUITING };
+      }
+      return mission;
+    });
+
+    if (missionsUpdated) {
+      currentDb.missions = updatedMissions;
+      saveDb(currentDb);
+    }
+    
+    return updatedMissions;
+  },
   getTeams: (): Team[] => getDb().teams,
-  getPendingPlayers: (): PendingPlayer[] => getDb().pendingPlayers,
+  getReports: (): Report[] => getDb().reports || [],
   
   // WRITE
   addUser: (user: User) => {
@@ -39,29 +59,24 @@ export const db = {
     saveDb(currentDb);
   },
 
+  addReport: (report: Report) => {
+    const currentDb = getDb();
+    if (!currentDb.reports) {
+      currentDb.reports = [];
+    }
+    currentDb.reports.push(report);
+    saveDb(currentDb);
+  },
+
   updateMissions: (missions: Mission[]) => {
       const currentDb = getDb();
       currentDb.missions = missions;
       saveDb(currentDb);
   },
-
-  addPendingPlayer: (pendingPlayer: PendingPlayer) => {
-     const currentDb = getDb();
-     if(!currentDb.pendingPlayers.some((p: PendingPlayer) => p.mission_id === pendingPlayer.mission_id && p.player_email === pendingPlayer.player_email)) {
-       currentDb.pendingPlayers.push(pendingPlayer);
-       saveDb(currentDb);
-     }
-  },
   
   updateTeams: (teams: Team[]) => {
       const currentDb = getDb();
       currentDb.teams = teams;
-      saveDb(currentDb);
-  },
-
-  updatePendingPlayers: (players: PendingPlayer[]) => {
-      const currentDb = getDb();
-      currentDb.pendingPlayers = players;
       saveDb(currentDb);
   },
 

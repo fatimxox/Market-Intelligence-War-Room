@@ -1,7 +1,8 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { User, UserRole } from '../../types.ts';
-import { LogOut, Target, BarChart3, FileText, Zap, Shield, Users, Crown, Settings } from '../../constants.tsx';
+// FIX: Corrected icon import path
+import { LogOut, Target, BarChart3, FileText, Zap, Shield, Users, Crown, Settings } from '../../src/components/icons.tsx';
 
 interface SidebarProps {
   user: User;

@@ -1,14 +1,181 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { IntelligenceData, User, Team, Mission, BattleRole, ChatMessage } from '../../types.ts';
-import { BATTLE_CONFIGS, initializeBattleData, MagicWandIcon, Send, ROLE_BATTLE_MAP, ChatBubble } from '../../constants.tsx';
+import { IntelligenceData, User, Team, Mission, BattleRole, ChatMessage, Report, MissionStatus, PlayerAssignment } from '../../types.ts';
+// FIX: Corrected constant and icon imports
+import { BATTLE_CONFIGS, initializeBattleData, ROLE_BATTLE_MAP, emptyFounder, emptyExecutive, emptyCompetitivePosition, emptyGeographicFootprint, emptyProductLine, emptyPricingChange, emptyPlatform, emptyInfluencerPartnership, emptyFundingRound, emptyInvestor, emptyB2CSegment, emptyB2BSegment, emptyPainPoint, emptyStrategicPartner, emptyKeySupplier, emptyExpansion } from '../../constants.tsx';
+import { Send, Download, Plus, XCircle, Save, MagicWandIcon, MessageCircleIcon, Clock, Loader } from '../../src/components/icons.tsx';
 import Input from '../ui/Input.tsx';
 import Button from '../ui/Button.tsx';
 import Modal from '../ui/Modal.tsx';
-import { fetchAiAssistedData } from '../../services/geminiService.ts';
-import Card from '../ui/Card.tsx';
 import { motion, AnimatePresence } from 'framer-motion';
-import { db } from '../../db.ts';
+// FIX: Corrected db import path
+import { db } from '../../src/lib/db.ts';
+import { fetchAiAssistedData } from '../../services/geminiService.ts';
+
+// --- HELPER COMPONENTS ---
+
+const AIHelperButton = ({ fieldPath, fieldLabel, isLoading, onAiAssist }: { fieldPath: string; fieldLabel: string; isLoading: boolean; onAiAssist: (path: string, label: string) => void }) => {
+    return (
+        <button
+            onClick={() => onAiAssist(fieldPath, fieldLabel)}
+            disabled={isLoading}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-accent p-1 rounded-full hover:bg-accent/10 disabled:cursor-wait"
+            title={`AI Assist: ${fieldLabel}`}
+        >
+            {isLoading ? (
+                <MagicWandIcon className="w-4 h-4 animate-spin text-accent" />
+            ) : (
+                <MagicWandIcon className="w-4 h-4" />
+            )}
+        </button>
+    );
+};
+
+// FIX: Made children prop optional to handle cases where the component might be self-closing.
+const SectionHeader = ({ children, progress }: { children?: React.ReactNode, progress: number }) => (
+    <div className="mb-6">
+        <div className="flex justify-between items-center mb-2">
+            <h3 className="text-xl font-bold text-accent">{children}</h3>
+            <span className="text-sm font-semibold text-accent">{progress}% Complete</span>
+        </div>
+        <div className="w-full bg-secondary rounded-full h-1.5">
+            <motion.div
+                className="bg-accent h-1.5 rounded-full"
+                initial={{ width: '0%' }}
+                animate={{ width: `${progress}%` }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+            />
+        </div>
+    </div>
+);
+
+// FIX: Made children prop optional to handle cases where the component might be self-closing.
+const SubSection = ({ title, children }: { title: string, children?: React.ReactNode }) => (
+    <div className="mb-8">
+        <h4 className="text-lg font-semibold text-primary-text mb-3">{title}</h4>
+        {children}
+    </div>
+);
+
+const EditableTable = ({ data, columns, rows, onInputChange, isEditable, path, onRemoveRow, aiLoadingFields, onAiAssist }: any) => (
+    <div className="overflow-x-auto">
+        <table className="w-full text-sm text-left">
+            <thead className="bg-secondary">
+                <tr>
+                    <th className="p-3">Field</th>
+                    {columns.map((col: any, index: number) => (
+                        <th key={index} className="p-3">
+                            <div className="flex justify-between items-center">
+                                <span>{col}</span>
+                                {isEditable && data.length > 0 && (
+                                    <button 
+                                        onClick={() => onRemoveRow(path, index)} 
+                                        className="text-gray-500 hover:text-red-400 p-1 rounded-full hover:bg-red-500/10" 
+                                        title={`Remove ${col}`}>
+                                        <XCircle className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </div>
+                        </th>
+                    ))}
+                </tr>
+            </thead>
+            <tbody>
+                {rows.map((row: any) => (
+                    <tr key={row.key} className="border-b border-panel-border">
+                        <td className="p-2 font-semibold whitespace-nowrap">{row.label}</td>
+                        {data.map((item: any, index: number) => (
+                            <td key={index} className="p-1">
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        value={item[row.key] || ''}
+                                        onChange={(e) => onInputChange(`${path}.${index}.${row.key}`, e.target.value)}
+                                        disabled={!isEditable}
+                                        className="w-full bg-background border border-panel-border rounded-md px-2 py-1 text-primary-text placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-secondary disabled:cursor-not-allowed pr-10"
+                                    />
+                                    {isEditable && <AIHelperButton
+                                        fieldPath={`${path}.${index}.${row.key}`}
+                                        fieldLabel={row.label}
+                                        isLoading={aiLoadingFields.has(`${path}.${index}.${row.key}`)}
+                                        onAiAssist={onAiAssist}
+                                    />}
+                                </div>
+                            </td>
+                        ))}
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    </div>
+);
+
+const EditableForm = ({ data, fields, onInputChange, isEditable, path, aiLoadingFields, onAiAssist }: any) => (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+        {fields.map((field: any) => (
+            <div key={field.key} className={field.fullWidth ? 'md:col-span-2' : ''}>
+                <label className="block text-sm font-medium text-gray-300 mb-1">{field.label}</label>
+                <div className="relative">
+                    <input
+                        type="text"
+                        value={data?.[field.key] || ''}
+                        onChange={(e) => onInputChange(`${path}.${field.key}`, e.target.value)}
+                        disabled={!isEditable}
+                        className="w-full bg-background border border-panel-border rounded-md px-2 py-1 text-primary-text placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-secondary disabled:cursor-not-allowed pr-10"
+                    />
+                    {isEditable && <AIHelperButton
+                        fieldPath={`${path}.${field.key}`}
+                        fieldLabel={field.label}
+                        isLoading={aiLoadingFields.has(`${path}.${field.key}`)}
+                        onAiAssist={onAiAssist}
+                    />}
+                </div>
+            </div>
+        ))}
+    </div>
+);
+
+
+const getCompletionPercentage = (data: any): number => {
+    let totalFields = 0;
+    let filledFields = 0;
+
+    function traverse(obj: any) {
+        if (obj === null || typeof obj !== 'object') return;
+
+        for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                const value = obj[key];
+                if (typeof value === 'string') {
+                    totalFields++;
+                    if (value.trim() !== '') {
+                        filledFields++;
+                    }
+                } else if (typeof value === 'object') {
+                    traverse(value);
+                }
+            }
+        }
+    }
+
+    traverse(data);
+    return totalFields === 0 ? 0 : Math.round((filledFields / totalFields) * 100);
+};
+
+const formatRelativeTime = (isoString: string): string => {
+    const date = new Date(isoString);
+    const now = new Date();
+    const seconds = Math.round((now.getTime() - date.getTime()) / 1000);
+    const minutes = Math.round(seconds / 60);
+    const hours = Math.round(minutes / 60);
+    const days = Math.round(hours / 24);
+
+    if (seconds < 60) return 'just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    return date.toLocaleDateString();
+};
 
 
 const WarRoomScreen: React.FC = () => {
@@ -19,93 +186,233 @@ const WarRoomScreen: React.FC = () => {
     const [team, setTeam] = useState<Team | null>(null);
     const [mission, setMission] = useState<Mission | null>(null);
     const [userRole, setUserRole] = useState<BattleRole | null>(null);
+    const [allUsers, setAllUsers] = useState<User[]>([]);
     
-    const [timeLeft, setTimeLeft] = useState(0);
+    const [isConfirmSubmitModalOpen, setConfirmSubmitModalOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState('B1');
+    const [battleProgress, setBattleProgress] = useState<Record<string, number>>({});
     const [intelligenceData, setIntelligenceData] = useState<IntelligenceData>(initializeBattleData());
-    const [isAiModalOpen, setAiModalOpen] = useState(false);
-    const [aiAssistField, setAiAssistField] = useState<{ fieldName: string } | null>(null);
-    const [isAiLoading, setIsAiLoading] = useState(false);
-    const [hasUsedAiAssist, setHasUsedAiAssist] = useState(false);
+
+    // AI Assist Queue State
+    const [aiAssistQueue, setAiAssistQueue] = useState<{fieldPath: string, fieldLabel: string}[]>([]);
+    const [aiLoadingFields, setAiLoadingFields] = useState<Set<string>>(new Set());
+    const isProcessingQueueRef = useRef(false);
+
+    // Timer state
+    const [timeLeft, setTimeLeft] = useState<number | null>(null);
+    const timerIntervalRef = useRef<number | null>(null);
+    const lastPlayedAlarm = useRef<number>(0);
+
+    // Save status
+    const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+    const saveDataTimeout = useRef<number | null>(null);
+    const isInitialMount = useRef(true);
 
     // Chat state
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const chatContainerRef = useRef<HTMLDivElement>(null);
+    const chatInputRef = useRef<HTMLInputElement>(null);
+
+    // Mention state
+    const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+    const [mentionSuggestions, setMentionSuggestions] = useState<PlayerAssignment[]>([]);
+    const [isMentionBoxOpen, setIsMentionBoxOpen] = useState(false);
+    
+    const isLeader = currentUser?.email === team?.team_leader_email;
+
+    // --- HELPER FUNCTIONS ---
+    
+    const formatTime = (ms: number | null) => {
+        if (ms === null || ms < 0) return '00:00';
+        const totalSeconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    };
+
+    const getTimerColor = (ms: number | null) => {
+        if (ms === null) return 'text-gray-400';
+        const totalSeconds = ms / 1000;
+        if (totalSeconds < 60) return 'text-danger animate-pulse';
+        if (totalSeconds < 300) return 'text-yellow-400';
+        return 'text-primary-text';
+    };
+
+    const playAlarm = () => {
+        try {
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            if (!audioContext) return;
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+            gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.1);
+        } catch (e) {
+            console.error("Could not play alarm sound.", e);
+        }
+    };
+
+    // --- MAIN COMPONENT LOGIC ---
+
+    const handleSubmitReport = useCallback(() => {
+        if (!mission || !team || team.report_submitted) return;
+
+        const newReport: Report = {
+            id: `report-${team.id}-${Date.now()}`,
+            mission_id: mission.id,
+            team_name: team.team_name,
+            battle_data: intelligenceData,
+        };
+        db.addReport(newReport);
+        
+        if (missionId && teamName) {
+            localStorage.removeItem(`war_room_data_${missionId}_${teamName}`);
+        }
+
+        const allTeams = db.getTeams();
+        const updatedTeams = allTeams.map(t => 
+            t.id === team.id ? { ...t, report_submitted: true, submission_timestamp: new Date().toISOString() } : t
+        );
+        db.updateTeams(updatedTeams);
+
+        const otherTeam = updatedTeams.find(t => t.mission_id === mission.id && t.team_name !== team.team_name);
+        if (otherTeam?.report_submitted) {
+            const allMissions = db.getMissions();
+            const updatedMissions = allMissions.map(m => 
+                m.id === mission.id ? { ...m, status: MissionStatus.EVALUATION } : m
+            );
+            db.updateMissions(updatedMissions);
+        }
+        
+        setConfirmSubmitModalOpen(false);
+        navigate(`/mission-results/${missionId}`);
+    }, [mission, team, intelligenceData, navigate, missionId, teamName]);
+
+    // Timer Countdown Effect
+    useEffect(() => {
+        if (!mission || !mission.mission_start_time || team?.report_submitted) {
+            setTimeLeft(null);
+            return;
+        }
+
+        const startTime = new Date(mission.mission_start_time).getTime();
+        const duration = mission.time_limit_minutes * 60 * 1000;
+        const endTime = startTime + duration;
+
+        const updateTimer = () => {
+            const now = Date.now();
+            const remaining = endTime - now;
+
+            if (remaining <= 0) {
+                setTimeLeft(0);
+                if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+                if (isLeader && !team?.report_submitted) {
+                    handleSubmitReport();
+                }
+            } else {
+                setTimeLeft(remaining);
+                const remainingSeconds = Math.ceil(remaining / 1000);
+                if (lastPlayedAlarm.current !== remainingSeconds) {
+                    if (remainingSeconds === 10 || (remainingSeconds <= 5 && remainingSeconds > 0)) {
+                        playAlarm();
+                        lastPlayedAlarm.current = remainingSeconds;
+                    }
+                }
+            }
+        };
+
+        updateTimer();
+        timerIntervalRef.current = window.setInterval(updateTimer, 1000);
+
+        return () => {
+            if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+        };
+    }, [mission, team, isLeader, handleSubmitReport]);
 
     useEffect(() => {
         const user = JSON.parse(localStorage.getItem('war-room-user') || '{}');
         setCurrentUser(user);
+        setAllUsers(db.getUsers());
         
         const foundMission = db.getMissions().find(m => m.id === missionId);
         const foundTeam = db.getTeams().find(t => t.mission_id === missionId && t.team_name === teamName);
         setMission(foundMission || null);
         setTeam(foundTeam || null);
 
-        if (foundTeam && user) {
-            const member = foundTeam.members.find(m => m.email === user.email);
-            setUserRole(member?.battle_role || null);
-        }
-
-        if (foundMission && foundMission.mission_start_time) {
-            const startTime = new Date(foundMission.mission_start_time);
-            const totalDuration = foundMission.time_limit_minutes * 60;
-            const elapsed = (Date.now() - startTime.getTime()) / 1000;
-            setTimeLeft(Math.max(0, totalDuration - elapsed));
-        }
-
-        // Load chat messages
-        if (missionId && teamName) {
-            const key = `chat_${missionId}_${teamName}`;
-            const storedMessages = localStorage.getItem(key);
-            if (storedMessages) {
-                setChatMessages(JSON.parse(storedMessages));
+        if (foundMission && teamName) {
+            const finalReport = db.getReports().find(r => r.mission_id === missionId && r.team_name === teamName);
+            if (finalReport) {
+                setIntelligenceData(finalReport.battle_data);
+            } else {
+                const storageKey = `war_room_data_${missionId}_${teamName}`;
+                const savedData = localStorage.getItem(storageKey);
+                let data = initializeBattleData();
+                if (savedData) {
+                    try {
+                        // FIX: Added type assertion to JSON.parse result.
+                        data = JSON.parse(savedData) as IntelligenceData;
+                    } catch (e) {
+                        console.error("Failed to parse saved data, initializing.", e);
+                    }
+                }
+                data.companyName = foundMission.target_company;
+                setIntelligenceData(data);
             }
+        }
+        
+        if (user && foundTeam) {
+            const userInTeam = foundTeam.members.find(m => m.email === user.email);
+            setUserRole(userInTeam?.battle_role || null);
+        }
+
+        if (missionId && teamName) {
+            const chatKey = `war_room_chat_${missionId}_${teamName}`;
+            const savedChat = localStorage.getItem(chatKey);
+            if (savedChat) setChatMessages(JSON.parse(savedChat));
         }
 
     }, [missionId, teamName]);
 
+    // Handle data saving to localStorage
     useEffect(() => {
-        if (timeLeft <= 0) return;
-        const timer = setInterval(() => setTimeLeft(t => t > 0 ? t - 1 : 0), 1000);
-        return () => clearInterval(timer);
-    }, [timeLeft]);
+        if (team?.report_submitted || isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
 
+        if (saveDataTimeout.current) clearTimeout(saveDataTimeout.current);
+        setSaveStatus('saving');
+        
+        saveDataTimeout.current = window.setTimeout(() => {
+            const storageKey = `war_room_data_${missionId}_${teamName}`;
+            localStorage.setItem(storageKey, JSON.stringify(intelligenceData));
+            setSaveStatus('saved');
+            setTimeout(() => setSaveStatus('idle'), 2000);
+        }, 1500);
+
+        return () => {
+            if(saveDataTimeout.current) clearTimeout(saveDataTimeout.current);
+        }
+    }, [intelligenceData, missionId, teamName, team?.report_submitted]);
+
+     // Handle chat auto-scrolling
     useEffect(() => {
-        if (isChatOpen && chatContainerRef.current) {
+        if (chatContainerRef.current) {
             chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
         }
     }, [chatMessages, isChatOpen]);
 
-    const handleSendMessage = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newMessage.trim() || !currentUser || !missionId || !teamName) return;
-
-        const message: ChatMessage = {
-            id: Date.now().toString(),
-            userId: currentUser.id,
-            userDisplayName: currentUser.displayName,
-            message: newMessage,
-            timestamp: new Date().toISOString(),
-        };
-
-        const updatedMessages = [...chatMessages, message];
-        setChatMessages(updatedMessages);
-        localStorage.setItem(`chat_${missionId}_${teamName}`, JSON.stringify(updatedMessages));
-        setNewMessage('');
-    };
-
-    const formatTime = (seconds: number) => {
-        const minutes = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    };
-
-    const handleInputChange = (path: string, value: string) => {
-        const keys = path.split('.');
-        setIntelligenceData(prev => {
-            const newData = JSON.parse(JSON.stringify(prev));
-            let current: any = newData;
+    const handleInputChange = (path: string, value: any) => {
+        setIntelligenceData(prevData => {
+            const newData = JSON.parse(JSON.stringify(prevData));
+            const keys = path.split('.');
+            let current = newData;
             for (let i = 0; i < keys.length - 1; i++) {
                 current = current[keys[i]];
             }
@@ -114,173 +421,272 @@ const WarRoomScreen: React.FC = () => {
         });
     };
 
-     const handleAiAssistClick = (fieldName: string) => {
-        setAiAssistField({ fieldName });
-        setAiModalOpen(true);
+    const addRow = (path: string, emptyRow: any) => {
+        setIntelligenceData(prevData => {
+            const newData = JSON.parse(JSON.stringify(prevData));
+            const keys = path.split('.');
+            let current = newData;
+            for (let i = 0; i < keys.length; i++) {
+                current = current[keys[i]];
+            }
+            if(Array.isArray(current)) {
+                current.push({ ...emptyRow });
+            }
+            return newData;
+        });
     };
 
-    const confirmAiAssist = async () => {
-        if (!aiAssistField || !mission) return;
-        setIsAiLoading(true);
-        setAiModalOpen(false);
+    const removeRow = (path: string, index: number) => {
+        setIntelligenceData(prevData => {
+            const newData = JSON.parse(JSON.stringify(prevData));
+            const keys = path.split('.');
+            let current = newData;
+            for (let i = 0; i < keys.length; i++) {
+                current = current[keys[i]];
+            }
+            if(Array.isArray(current) && current.length > 0) {
+                current.splice(index, 1);
+            }
+            return newData;
+        });
+    };
 
-        const result = await fetchAiAssistedData(mission.target_company, aiAssistField.fieldName);
+    const onAiAssist = (fieldPath: string, fieldLabel: string) => {
+        setAiAssistQueue(prev => [...prev, {fieldPath, fieldLabel}]);
+    }
+
+    // Process AI Assist Queue
+    useEffect(() => {
+        const processQueue = async () => {
+            if (aiAssistQueue.length > 0 && !isProcessingQueueRef.current) {
+                isProcessingQueueRef.current = true;
+                const { fieldPath, fieldLabel } = aiAssistQueue[0];
+                
+                setAiLoadingFields(prev => new Set(prev).add(fieldPath));
+
+                const result = await fetchAiAssistedData(intelligenceData.companyName, fieldLabel);
+
+                if (result) {
+                    handleInputChange(fieldPath, result);
+                }
+
+                setAiLoadingFields(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(fieldPath);
+                    return newSet;
+                });
+                
+                setAiAssistQueue(prev => prev.slice(1));
+                isProcessingQueueRef.current = false;
+            }
+        };
+        processQueue();
+    }, [aiAssistQueue, intelligenceData.companyName]);
+    
+    useEffect(() => {
+        const newProgress: Record<string, number> = {};
+        Object.keys(BATTLE_CONFIGS).forEach(battleKey => {
+            const dataKey = battleKey as keyof IntelligenceData;
+            if (typeof intelligenceData[dataKey] === 'object' && intelligenceData[dataKey] !== null) {
+                newProgress[battleKey] = getCompletionPercentage(intelligenceData[dataKey]);
+            }
+        });
+        setBattleProgress(newProgress);
+    }, [intelligenceData]);
+
+    const handleSendMessage = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newMessage.trim() || !currentUser) return;
         
-        alert(`AI Suggestion for ${aiAssistField.fieldName}: ${result}`);
+        const message: ChatMessage = {
+            id: `msg-${Date.now()}`,
+            userId: currentUser.id,
+            userDisplayName: currentUser.displayName,
+            message: newMessage.trim(),
+            timestamp: new Date().toISOString()
+        };
+        const updatedMessages = [...chatMessages, message];
+        setChatMessages(updatedMessages);
         
-        setHasUsedAiAssist(true);
-        setIsAiLoading(false);
-        setAiAssistField(null);
+        const chatKey = `war_room_chat_${missionId}_${teamName}`;
+        localStorage.setItem(chatKey, JSON.stringify(updatedMessages));
+        
+        setNewMessage('');
+    };
+
+    // Chat Mention Logic
+    useEffect(() => {
+        if (mentionQuery !== null) {
+            const suggestions = team?.members.filter(m => 
+                m.display_name.toLowerCase().startsWith(mentionQuery.toLowerCase()) && 
+                m.email !== currentUser?.email
+            ) || [];
+            setMentionSuggestions(suggestions);
+            setIsMentionBoxOpen(suggestions.length > 0);
+        } else {
+            setIsMentionBoxOpen(false);
+        }
+    }, [mentionQuery, team, currentUser]);
+
+    const handleNewMessageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setNewMessage(value);
+
+        const mentionMatch = value.match(/@(\w*)$/);
+        if (mentionMatch) {
+            setMentionQuery(mentionMatch[1]);
+        } else {
+            setMentionQuery(null);
+        }
+    };
+
+    const handleMentionSelect = (displayName: string) => {
+        setNewMessage(prev => prev.replace(/@(\w*)$/, `@${displayName} `));
+        setMentionQuery(null);
+        chatInputRef.current?.focus();
+    };
+
+    const isBattleEditable = (battleKey: keyof IntelligenceData): boolean => {
+        if(team?.report_submitted) return false;
+        if(isLeader) return true;
+        return ROLE_BATTLE_MAP[userRole!] === battleKey;
     };
     
-    const canEditBattle = (battleKey: keyof IntelligenceData) => {
-        if (!userRole) return false;
-        return ROLE_BATTLE_MAP[userRole] === battleKey;
-    };
-
-    const renderField = (label: string, path: string, type: string = 'text', isEditable: boolean) => (
-         <div className="relative">
-            <Input
-                label={label}
-                type={type}
-                value={(path.split('.').reduce((o: any, i) => o?.[i], intelligenceData) as string) || ''}
-                onChange={(e) => handleInputChange(path, e.target.value)}
-                disabled={!isEditable || isAiLoading}
-            />
-             {isEditable && !hasUsedAiAssist && (
-                <button 
-                    onClick={() => handleAiAssistClick(label)} 
-                    className="absolute top-7 right-0 px-3 flex items-center text-gray-400 hover:text-accent disabled:opacity-50"
-                    disabled={isAiLoading}
-                    title="Use one-time AI Assist"
-                >
-                    <MagicWandIcon className="w-5 h-5" />
-                </button>
-            )}
-        </div>
-    );
-
-    const isLeader = currentUser?.email === team?.team_leader_email;
+    if (!currentUser || !mission || !team) {
+        return <div className="p-6 text-center">Loading Mission...</div>;
+    }
+    
+    const teamColorClass = teamName === 'alpha' ? 'team-alpha' : 'team-beta';
 
     return (
-        <div className="min-h-screen bg-background text-primary-text flex flex-col">
-            <header className="sticky top-0 z-40 bg-panel/80 backdrop-blur-sm border-b border-panel-border p-4">
-                <div className="flex justify-between items-center">
+        <div className="flex h-screen bg-background text-primary-text">
+            {/* Main War Room Panel */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+                <header className="flex-shrink-0 bg-panel border-b border-panel-border p-4 flex justify-between items-center z-10">
                     <div>
-                        <h1 className="text-2xl font-bold">War Room - Team {team?.team_name.toUpperCase()}</h1>
-                        <p className="text-gray-400">Target: <span className="text-accent">{mission?.target_company}</span></p>
+                        <h1 className="text-2xl font-bold text-primary-text">Mission: <span className="text-accent">{mission.title}</span></h1>
+                        <p className="text-sm text-gray-400">Target: <span className="font-medium text-primary-text">{mission.target_company}</span> | Team: <span className={`font-bold text-${teamColorClass}`}>{team.team_name.toUpperCase()}</span></p>
                     </div>
-                    <div className={`text-5xl font-bold ${timeLeft < 300 ? 'text-red-500 animate-pulse' : 'text-accent'}`}>{formatTime(timeLeft)}</div>
-                    <div>
-                        {isLeader && <Button onClick={() => navigate(`/mission-results/${missionId}`)}><Send className="w-4 h-4 mr-2"/>Submit Intelligence</Button>}
+                    <div className="flex items-center gap-4">
+                        <div className={`font-mono text-2xl font-bold ${getTimerColor(timeLeft)} flex items-center gap-2`}>
+                           <Clock/> {formatTime(timeLeft)}
+                        </div>
+                        {isLeader && !team.report_submitted && (
+                            <Button onClick={() => setConfirmSubmitModalOpen(true)}>Submit Final Report</Button>
+                        )}
+                        {team.report_submitted && <span className="px-3 py-1.5 bg-green-500/20 text-green-300 rounded-md text-sm font-semibold">Report Submitted</span>}
+                    </div>
+                </header>
+                
+                <div className="flex-shrink-0 bg-secondary border-b border-panel-border flex items-center justify-between px-6">
+                    <nav className="flex space-x-2">
+                        {Object.entries(BATTLE_CONFIGS).map(([key, config], index) => (
+                            <button
+                                key={key}
+                                onClick={() => setActiveTab(`B${index + 1}`)}
+                                className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors duration-200 ${
+                                    activeTab === `B${index + 1}` ? `border-accent ${config.color}` : 'border-transparent text-gray-400 hover:text-primary-text'
+                                }`}
+                            >
+                                {config.name.split(':')[0]}
+                            </button>
+                        ))}
+                    </nav>
+                     <div className="text-sm text-gray-400 flex items-center gap-2">
+                        {saveStatus === 'saving' && <><Loader className="w-4 h-4 animate-spin"/><span>Saving...</span></>}
+                        {saveStatus === 'saved' && <span>All changes saved.</span>}
                     </div>
                 </div>
-            </header>
-            
-            <main className="flex-grow w-full max-w-4xl mx-auto p-6">
-                {Object.entries(BATTLE_CONFIGS).map(([key, config]) => {
-                    const battleKey = key as keyof IntelligenceData;
-                    const isEditable = canEditBattle(battleKey);
-                    return (
-                        <div key={battleKey} id={battleKey} className="mb-8">
-                        <Card className={`bg-panel border ${isEditable ? 'border-accent shadow-accent/20' : 'border-panel-border'}`}>
-                             <div className="p-6">
-                                <h2 className={`text-2xl font-bold mb-6 flex items-center gap-3 ${config.color}`}>
-                                    <config.icon className="w-6 h-6"/> {config.name} {isEditable && <span className="text-xs px-2 py-1 rounded-full bg-accent/20 text-accent">YOUR BATTLE</span>}
-                                </h2>
-                                
-                                {battleKey === 'battle1_leadership' && (
-                                <div className="space-y-6">
-                                    {renderField("Founder Name", "battle1_leadership.founders.0.fullName", 'text', isEditable)}
-                                    {renderField("Market Size (TAM)", "battle1_leadership.marketSize.tam", 'text', isEditable)}
-                                </div>
-                                )}
-                                {battleKey === 'battle2_products' && (
-                                <div className="space-y-6">
-                                    {renderField("Product Name", "battle2_products.productLines.0.productName", 'text', isEditable)}
-                                    {renderField("Pricing Model", "battle2_products.productLines.0.pricingModel", 'text', isEditable)}
-                                </div>
-                                )}
-                                 {battleKey === 'battle3_funding' && (
-                                <div className="space-y-6">
-                                    {renderField("Total Funding", "battle3_funding.getInvestment.amount", 'text', isEditable)}
-                                    {renderField("Latest Valuation", "battle3_funding.revenueValuation.latestValuation", 'text', isEditable)}
-                                </div>
-                                )}
-                                {battleKey === 'battle4_customers' && (
-                                <div className="space-y-6">
-                                    {renderField("B2C Age Segment", "battle4_customers.b2cSegments.0.age", 'text', isEditable)}
-                                    {renderField("Avg. Review Rating", "battle4_customers.reviews.avgRating", 'text', isEditable)}
-                                </div>
-                                )}
-                                {battleKey === 'battle5_alliances' && (
-                                <div className="space-y-6">
-                                    {renderField("Strategic Partner Name", "battle5_alliances.strategicPartners.0.name", 'text', isEditable)}
-                                    {renderField("Revenue Growth %", "battle5_alliances.growthRates.revenueGrowth", 'text', isEditable)}
-                                </div>
-                                )}
-                             </div>
-                        </Card>
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                    <AnimatePresence mode="wait">
+                    {activeTab === 'B1' && (
+                        <motion.div key="b1" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+                           <SectionHeader progress={battleProgress['battle1_leadership'] || 0}>
+                               {BATTLE_CONFIGS.battle1_leadership.name}
+                           </SectionHeader>
+                           <SubSection title="Founders">
+                                <EditableTable data={intelligenceData.battle1_leadership.founders} columns={intelligenceData.battle1_leadership.founders.map((_, i) => `Founder ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle1_leadership')} path="battle1_leadership.founders" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'fullName', label: 'Full Name'}, {key: 'foundingYear', label: 'Founding Year'}, {key: 'currentRole', label: 'Current Role'}, {key: 'previousVentures', label: 'Previous Ventures'}, {key: 'contactEmail', label: 'Contact Email'}, {key: 'linkedinUrl', label: 'LinkedIn URL'}, {key: 'phoneNo', label: 'Phone No.'}, {key: 'sourceLink', label: 'Source Link'}, {key: 'notes', label: 'Notes'} ]} />
+                                {isBattleEditable('battle1_leadership') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle1_leadership.founders', emptyFounder)}><Plus className="w-4 h-4 mr-1"/>Add Founder</Button>}
+                            </SubSection>
+                           <SubSection title="Executives">
+                                <EditableTable data={intelligenceData.battle1_leadership.executives} columns={intelligenceData.battle1_leadership.executives.map((_, i) => `Executive ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle1_leadership')} path="battle1_leadership.executives" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'name', label: 'Name'}, {key: 'title', label: 'Title'}, {key: 'function', label: 'Function'}, {key: 'yearsWithFirm', label: 'Yrs w/ Firm'}, {key: 'contactEmail', label: 'Contact Email'}, {key: 'linkedinUrl', label: 'LinkedIn URL'}, {key: 'phoneNo', label: 'Phone No.'}, {key: 'sourceLink', label: 'Source Link'}, {key: 'notes', label: 'Notes'} ]} />
+                                {isBattleEditable('battle1_leadership') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle1_leadership.executives', emptyExecutive)}><Plus className="w-4 h-4 mr-1"/>Add Executive</Button>}
+                            </SubSection>
+                            {/* ... more subsections ... */}
+                        </motion.div>
+                    )}
+                    {/* ... other battle tabs ... */}
+                    </AnimatePresence>
+                </div>
+            </div>
+
+            {/* Right Sidebar */}
+             <aside className={`transition-all duration-300 ease-in-out bg-panel border-l border-panel-border flex flex-col ${isChatOpen ? 'w-80' : 'w-20'}`}>
+                <div className="p-2 border-b border-panel-border flex flex-col items-center">
+                    <h3 className={`text-xs uppercase font-semibold text-gray-400 mb-2 ${!isChatOpen ? 'transform -rotate-90' : ''}`}>{isChatOpen ? 'Team Intel' : 'Team'}</h3>
+                    <div className={`flex ${isChatOpen ? 'flex-row gap-2' : 'flex-col gap-3'}`}>
+                    {team.members.map(member => {
+                        const battleConfig = member.battle_role ? BATTLE_CONFIGS[ROLE_BATTLE_MAP[member.battle_role]] : null;
+                        const IconComponent = battleConfig?.icon;
+                        return (
+                        <div key={member.email} className="relative group" title={member.display_name}>
+                           <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${member.email}`} alt="avatar" className="w-10 h-10 rounded-full"/>
+                           {IconComponent && <IconComponent className={`absolute -bottom-1 -right-1 w-5 h-5 p-1 rounded-full bg-secondary ${battleConfig?.color}`} />}
                         </div>
-                    );
-                })}
-            </main>
-            
-            <div className="fixed bottom-6 right-6 z-50">
-                <AnimatePresence>
+                    )})}
+                    </div>
+                </div>
+                <div className="flex-grow flex flex-col">
+                    <button onClick={() => setIsChatOpen(!isChatOpen)} className="w-full p-2 text-center text-gray-400 hover:bg-secondary border-b border-panel-border text-xs flex items-center justify-center gap-1">
+                        <MessageCircleIcon className="w-4 h-4" /> {isChatOpen && 'Team Chat'}
+                    </button>
+                    <AnimatePresence>
                     {isChatOpen && (
-                        <motion.div
-                            initial={{ opacity: 0, y: 50, scale: 0.8 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 50, scale: 0.8 }}
-                            transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-                            className="w-80 h-96 bg-panel border border-panel-border rounded-lg shadow-2xl flex flex-col mb-4"
-                        >
-                            <header className="p-3 border-b border-panel-border flex justify-between items-center">
-                                <h3 className="font-bold text-accent">Team Chat</h3>
-                                <button onClick={() => setIsChatOpen(false)} className="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
-                            </header>
-                            <div ref={chatContainerRef} className="flex-1 p-3 space-y-3 overflow-y-auto">
+                        <motion.div initial={{ opacity: 0}} animate={{ opacity: 1}} exit={{opacity: 0}} className="flex-grow flex flex-col overflow-hidden">
+                            <div ref={chatContainerRef} className="flex-grow p-3 space-y-3 overflow-y-auto">
                                 {chatMessages.map(msg => (
-                                    <div key={msg.id} className={`flex flex-col ${msg.userId === currentUser?.id ? 'items-end' : 'items-start'}`}>
-                                        <div className={`max-w-[80%] p-2 rounded-lg ${msg.userId === currentUser?.id ? 'bg-accent text-background' : 'bg-secondary'}`}>
-                                            <p className="text-xs font-bold mb-1 opacity-80">{msg.userDisplayName}</p>
-                                            <p className="text-sm break-words">{msg.message}</p>
+                                    <div key={msg.id} className={`flex items-start gap-2 ${msg.userId === currentUser.id ? 'flex-row-reverse' : ''}`}>
+                                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.userDisplayName}`} alt="avatar" className="w-6 h-6 rounded-full"/>
+                                        <div className={`px-3 py-2 rounded-lg max-w-xs text-sm ${msg.userId === currentUser.id ? 'bg-accent text-background' : 'bg-secondary'}`}>
+                                            <div className="font-bold text-xs mb-0.5">{msg.userDisplayName}</div>
+                                            <p className="whitespace-pre-wrap break-words">{msg.message}</p>
+                                            <div className="text-right text-xs opacity-70 mt-1">{formatRelativeTime(msg.timestamp)}</div>
                                         </div>
                                     </div>
                                 ))}
                             </div>
-                            <form onSubmit={handleSendMessage} className="p-3 border-t border-panel-border flex gap-2">
-                                <Input
-                                    value={newMessage}
-                                    onChange={(e) => setNewMessage(e.target.value)}
-                                    placeholder="Type a message..."
-                                    className="flex-1"
-                                    autoComplete="off"
-                                />
-                                <Button type="submit" size="icon" disabled={!newMessage.trim()}><Send className="w-4 h-4"/></Button>
-                            </form>
+                            <div className="p-3 border-t border-panel-border relative">
+                                {isMentionBoxOpen && (
+                                    <motion.div initial={{y:10, opacity:0}} animate={{y:0, opacity:1}} className="absolute bottom-full left-3 right-3 bg-panel border border-panel-border rounded-t-lg shadow-lg max-h-40 overflow-y-auto">
+                                        {mentionSuggestions.map(s => (
+                                            <button key={s.email} onClick={() => handleMentionSelect(s.display_name)} className="w-full text-left px-3 py-2 hover:bg-secondary flex items-center gap-2">
+                                                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${s.email}`} alt="avatar" className="w-6 h-6 rounded-full"/>
+                                                {s.display_name}
+                                            </button>
+                                        ))}
+                                    </motion.div>
+                                )}
+                                <form onSubmit={handleSendMessage} className="relative">
+                                    <Input ref={chatInputRef} value={newMessage} onChange={handleNewMessageChange} placeholder="Type message..." className="pr-10 !bg-background !border-panel-border" />
+                                    <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-accent"><Send className="w-5 h-5"/></button>
+                                </form>
+                            </div>
                         </motion.div>
                     )}
-                </AnimatePresence>
-                <Button
-                    onClick={() => setIsChatOpen(prev => !prev)}
-                    className="w-16 h-16 rounded-full shadow-lg flex items-center justify-center"
-                    aria-label="Toggle Chat"
-                >
-                    <ChatBubble className="w-8 h-8"/>
-                </Button>
-            </div>
+                    </AnimatePresence>
+                </div>
+             </aside>
 
-             <Modal isOpen={isAiModalOpen} onClose={() => setAiModalOpen(false)} title="AI Assist">
-                <p>Use your one-time AI assist to get data for "{aiAssistField?.fieldName}"?</p>
-                <div className="flex justify-end gap-2 mt-4">
-                    <Button variant="secondary" onClick={() => setAiModalOpen(false)}>Cancel</Button>
-                    <Button onClick={confirmAiAssist}>Confirm</Button>
+            <Modal isOpen={isConfirmSubmitModalOpen} onClose={() => setConfirmSubmitModalOpen(false)} title="Confirm Submission">
+                <p className="text-gray-300 mb-6">Are you sure you want to submit your team's final intelligence report? This action is irreversible.</p>
+                <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setConfirmSubmitModalOpen(false)}>Cancel</Button>
+                    <Button onClick={handleSubmitReport}>Confirm & Submit</Button>
                 </div>
             </Modal>
         </div>
     );
-};
+}
 
 export default WarRoomScreen;

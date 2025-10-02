@@ -2,8 +2,10 @@ import React, { useState, useEffect } from "react";
 import { User } from "../../types.ts";
 import Card from "../ui/Card.tsx";
 import Input from "../ui/Input.tsx";
-import { Crown, UserCheck, Shield, Search } from "../../constants.tsx";
-import { db } from "../../db.ts";
+// FIX: Corrected icon import path
+import { Crown, UserCheck, Shield, Search } from "../../src/components/icons.tsx";
+// FIX: Corrected db import path
+import { db } from "../../src/lib/db.ts";
 
 const UsersScreen = () => {
   const [allUsers, setAllUsers] = useState<User[]>([]);

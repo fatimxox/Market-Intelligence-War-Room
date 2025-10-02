@@ -8,6 +8,7 @@ export type BattleRole = 'market_commander' | 'arsenal_ranger' | 'capital_quarte
 
 export enum MissionStatus {
   DRAFT = 'draft',
+  SCHEDULED = 'scheduled',
   RECRUITING = 'recruiting',
   ACTIVE = 'active',
   EVALUATION = 'evaluation',
@@ -43,7 +44,7 @@ export type Team = {
 };
 
 export type Mission = {
-  id: string;
+  id:string;
   title: string;
   target_company: string;
   description: string;
@@ -56,15 +57,6 @@ export type Mission = {
   team_alpha_score?: number;
   team_beta_score?: number;
 };
-
-export type PendingPlayer = {
-  id: string;
-  mission_id: string;
-  player_email: string;
-  player_name: string;
-  joined_at: string;
-  assigned_to_team: boolean;
-}
 
 export type ChatMessage = {
   id: string;
@@ -107,7 +99,13 @@ export interface GetInvestment {
   amount: string; yesNo: string; rounds: string; sourceLink: string;
 }
 export interface FundingRound {
-  date: string; series: string; amount: string; investors: string; leadInvestor: string; notes: string;
+  date: string;
+  series: string;
+  amount: string;
+  numberOfInvestors: string;
+  investors: string;
+  leadInvestor: string;
+  notes: string;
 }
 export interface Investor {
   name: string; type: string; stake: string; sourceLink: string; notes: string;
@@ -141,6 +139,8 @@ export interface Expansion {
 }
 
 export type IntelligenceData = {
+  companyName: string;
+  companyBrief: string;
   battle1_leadership: {
     founders: Founder[];
     executives: Executive[];

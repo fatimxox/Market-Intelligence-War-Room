@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { User, Mission } from "../../types.ts";
 import Card from "../ui/Card.tsx";
-import { Trophy, Target, TrendingUp, Calendar, Award, Star, Zap } from "../../constants.tsx";
-import { db } from "../../db.ts";
+// FIX: Corrected icon import path
+import { Trophy, Target, TrendingUp, Calendar, Award, Star, Zap } from "../../src/components/icons.tsx";
+// FIX: Corrected db import path
+import { db } from "../../src/lib/db.ts";
 
 const MyCareerScreen = () => {
   const [user, setUser] = useState<User | null>(null);
