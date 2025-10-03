@@ -3,7 +3,7 @@ import { MOCK_DB } from '../constants';
 import { User, Mission, Team, Report, MissionStatus } from '../types';
 
 const DB_KEY = 'intel_wars_db';
-const USE_SUPABASE = true;
+const USE_SUPABASE = false;
 
 const getDb = () => {
   try {
