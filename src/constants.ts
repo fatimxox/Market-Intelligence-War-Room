@@ -1,6 +1,6 @@
 import React from 'react';
-import { IntelligenceData, BattleRole } from './types';
-import { Crown, Crosshair, DollarSign, Eye, Shield, GoogleIcon, LinkedInIcon, CrunchbaseIcon } from './components/icons';
+import { IntelligenceData, BattleRole, User, UserRole, Mission, MissionStatus, Team, Report } from './types.ts';
+import { Crown, Crosshair, DollarSign, Eye, Shield, GoogleIcon, LinkedInIcon, CrunchbaseIcon } from './components/icons.tsx';
 
 // --- BATTLE & ROLE CONSTANTS ---
 
@@ -108,12 +108,8 @@ export const initializeBattleData = (): IntelligenceData => ({
 
 
 // --- MOCK DATABASE ---
-// NOTE: This will be replaced by a real database service.
-// The structure is kept in `constants.ts` for easy prototyping.
 
-import { User, UserRole, Mission, MissionStatus, Team, Report } from './types';
-
-const mockUsers: User[] = [
+let mockUsers: User[] = [
   { id: 'admin-001', displayName: 'Game Master', email: 'ateffatim@gmail.com', role: UserRole.ADMIN, total_missions: 5, missions_won: 4 },
   { id: 'player-1', displayName: 'Alice', email: 'alice@example.com', role: UserRole.PLAYER, total_missions: 3, missions_won: 2, preferred_battle_role: 'arsenal_ranger' },
   { id: 'player-2', displayName: 'Bob', email: 'bob@example.com', role: UserRole.PLAYER, total_missions: 4, missions_won: 1, preferred_battle_role: 'capital_quartermaster' },
@@ -122,7 +118,7 @@ const mockUsers: User[] = [
   { id: 'player-5', displayName: 'Ethan', email: 'ethan@example.com', role: UserRole.PLAYER, total_missions: 1, missions_won: 0, preferred_battle_role: 'alliance_broker' },
 ];
 
-const mockMissions: Mission[] = [
+let mockMissions: Mission[] = [
   { 
     id: 'mission-001', 
     title: 'Operation Gold Rush',
@@ -155,11 +151,35 @@ const mockMissions: Mission[] = [
     created_by_admin: 'ateffatim@gmail.com',
     winner_team: 'alpha',
     team_alpha_score: 88,
-    team_beta_score: 75
+    team_beta_score: 75,
+    score_details: {
+      team_alpha_score: {
+        accuracy_score: 52,
+        sources_score: 13,
+        presentation_score: 14,
+        speed_score: 9,
+        reasoning: "Team Alpha provided highly detailed notes and found several credible sources for their data, showing deep analysis."
+      },
+      team_beta_score: {
+        accuracy_score: 45,
+        sources_score: 10,
+        presentation_score: 12,
+        speed_score: 8,
+        reasoning: "A solid report, but some fields were left blank and the company brief lacked a strong narrative."
+      },
+      winning_team_reasoning: "Team Alpha wins due to a substantially more complete and insightful report. Their data accuracy and strategic notes in the leadership section provided a clear edge.",
+      battle_winners: [
+        { battle: "battle1_leadership", winner: "alpha", reasoning: "Alpha's report on founders and executives was more comprehensive and well-sourced." },
+        { battle: "battle2_products", winner: "beta", reasoning: "Beta provided a better analysis of social media engagement and recent pricing changes." },
+        { battle: "battle3_funding", winner: "alpha", reasoning: "Alpha uncovered more details about recent funding rounds and key investors." },
+        { battle: "battle4_customers", winner: "tie", reasoning: "Both teams provided a similar level of detail on customer segments." },
+        { battle: "battle5_alliances", winner: "beta", reasoning: "Beta identified a key supplier relationship that Alpha missed." }
+      ]
+    }
   }
 ];
 
-const mockTeams: Team[] = [
+let mockTeams: Team[] = [
   {
     id: 'team-alpha-002',
     mission_id: 'mission-002',
@@ -181,7 +201,7 @@ const mockTeams: Team[] = [
   }
 ];
 
-const mockReports: Report[] = [];
+let mockReports: Report[] = [];
 
 export const MOCK_DB = {
   users: mockUsers,

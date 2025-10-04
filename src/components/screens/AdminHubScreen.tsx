@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import Card from '../ui/Card';
-import Button from '../ui/Button';
-import Input from '../ui/Input';
-import Modal from '../ui/Modal';
-import DateTimePicker from '../ui/DateTimePicker';
-import { Mission, MissionStatus, User, Team } from '../../types';
-import { PREDEFINED_COMPANIES } from '../../constants';
-import { Crown, Plus, Target, Users, Clock, Trophy, Play, Pause, Eye, ArrowLeft, Calendar, Zap, AlertCircle } from '../icons';
-import { db } from '../../lib/db';
+import Card from '../ui/Card.tsx';
+import Button from '../ui/Button.tsx';
+import Input from '../ui/Input.tsx';
+import Modal from '../ui/Modal.tsx';
+import DateTimePicker from '../ui/DateTimePicker.tsx';
+import { Mission, MissionStatus, User, Team } from '../../types.ts';
+import { Crown, Plus, Target, Users, Clock, Trophy, Play, Pause, Eye, ArrowLeft, Calendar, Zap, AlertCircle } from '../icons.tsx';
+import { PREDEFINED_COMPANIES } from '../../constants.ts';
+import { db } from '../../lib/db.ts';
 
 const MissionHubScreen: React.FC = () => {
     const [user, setUser] = useState<User | null>(null);
@@ -66,7 +66,6 @@ const MissionHubScreen: React.FC = () => {
         }
     };
 
-    // FIX: Added explicit return type React.ReactElement<React.SVGProps<SVGSVGElement>> to help TypeScript infer props for React.cloneElement.
     const getStatusInfo = (status: MissionStatus): { color: string; icon: React.ReactElement<React.SVGProps<SVGSVGElement>> } => {
         switch (status) {
             case 'draft': return { color: 'bg-gray-500/20 text-gray-400 border-gray-500/30', icon: <AlertCircle/> };
@@ -116,7 +115,7 @@ const MissionHubScreen: React.FC = () => {
                                     <p className="font-medium">
                                         {m.display_name}
                                     </p>
-                                    {alphaTeam.team_leader_email === m.email && <Crown className="w-5 h-5 text-accent ml-auto" title="Team Leader" />}
+                                    {alphaTeam.team_leader_email === m.email && <Crown className="w-5 h-5 text-accent ml-auto" />}
                                 </div>
                             ))}
                         </div>
@@ -139,7 +138,7 @@ const MissionHubScreen: React.FC = () => {
                                     <p className="font-medium">
                                         {m.display_name}
                                     </p>
-                                    {betaTeam.team_leader_email === m.email && <Crown className="w-5 h-5 text-accent ml-auto" title="Team Leader" />}
+                                    {betaTeam.team_leader_email === m.email && <Crown className="w-5 h-5 text-accent ml-auto" />}
                                 </div>
                             ))}
                         </div>

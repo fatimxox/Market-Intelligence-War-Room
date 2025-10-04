@@ -109,7 +109,8 @@ const MissionLobbyScreen: React.FC = () => {
                             <div key={member.email} className="bg-secondary p-3 rounded-lg flex items-center gap-3">
                                 <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${member.email}`} alt="avatar" className="w-8 h-8 rounded-full bg-accent/20"/>
                                 <span className="font-medium">{member.display_name}</span>
-                                {team.team_leader_email === member.email && <Crown className={`w-5 h-5 ml-auto ${color}`} title="Team Leader"/>}
+                                {/* FIX: Removed invalid 'title' prop from Crown component. */}
+                                {team.team_leader_email === member.email && <Crown className={`w-5 h-5 ml-auto ${color}`}/>}
                             </div>
                         ))}
                     </div>

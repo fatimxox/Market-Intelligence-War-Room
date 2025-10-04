@@ -1,18 +1,18 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { IntelligenceData, Mission, Team, AIScoreResult } from '../types';
 
 const getApiKey = () => {
-  const key = import.meta.env.VITE_API_KEY;
+  // FIX: Use process.env.API_KEY as required by the guidelines. This also resolves the TypeScript error with import.meta.env.
+  const key = process.env.API_KEY;
   if (!key) {
-    console.warn("VITE_API_KEY environment variable not set. AI features will not work.");
+    // FIX: Updated warning message to refer to the correct environment variable.
+    console.warn("API_KEY environment variable not set. AI features will not work.");
     return null;
   }
   return key;
 };
 
 const apiKey = getApiKey();
-// FIX: Correctly initialize GoogleGenAI with a named apiKey parameter.
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 export const scoreReports = async (
@@ -47,7 +47,7 @@ export const scoreReports = async (
   const alphaTimeTakenFormatted = formatDuration(alphaTimeTakenMs);
   const betaTimeTakenFormatted = formatDuration(betaTimeTakenMs);
 
-  const prompt = `You are an expert market intelligence analyst. You are given two competing intelligence reports on the company "${companyName}". Your task is to score both reports, determine an overall winner, and also determine a winner for each of the 5 battle sections.
+  const prompt = `You are 'The Analyst', a legendary figure in corporate espionage, known for your meticulous and unbiased evaluation of intelligence reports. Your task is to critically assess two competing reports on the company "${companyName}". You will score both reports based on the provided criteria, declare an overall winner with a conclusive final verdict, and determine a winner for each of the 5 distinct battle sections.
 
 **Mission Context:**
 The mission had a time limit of ${mission.time_limit_minutes} minutes.
@@ -65,15 +65,15 @@ ${reportBetaStr}
 \`\`\`
 
 **Scoring Criteria (Total 100 points):**
-1.  **Data Accuracy, Completeness, and Insight (60 points):** Evaluate the likely accuracy and the completeness of the data provided. Penalize for empty fields, vague entries, or nonsensical data. Importantly, a significant portion of this score should come from the quality of the \`notes\` fields. Reward insightful, relevant notes that provide context, analysis, or strategic observations, as this demonstrates a deeper level of intelligence gathering beyond simple data entry.
-2.  **Source Links (15 points):** Award points based on the number of non-empty \`sourceLink\` fields.
-3.  **Teamwork & Presentation (15 points):** Evaluate the overall structure, coherence, and the quality of the 'companyBrief'.
-4.  **Speed Score (10 points):** Based on the submission times provided, award points for speed. The faster a team submits relative to the time limit, the more points they should get. A team submitting at the last second should get 0 points, while a team submitting instantly would get 10.
+1.  **Data Accuracy, Completeness, and Insight (60 points):** Scrutinize the accuracy and depth of the data. Penalize for empty fields, vagueness, or unverified claims. A significant portion of this score must come from the quality of the \`notes\` fields. High-value notes provide context, strategic analysis, or actionable insights, demonstrating intelligence beyond simple data entry.
+2.  **Source Links (15 points):** Award points for the quantity and quality of verifiable \`sourceLink\` fields. More credible sources (e.g., official filings, reputable news) are better than blogs.
+3.  **Teamwork & Presentation (15 points):** Evaluate the report's coherence, structure, and the quality of the 'companyBrief'. A well-synthesized brief that tells a clear story is a sign of good teamwork.
+4.  **Speed Score (10 points):** Based on submission times, award points for swiftness. A team submitting at the last second gets 0 points. A team submitting instantly gets 10. Distribute points linearly based on time saved.
 
 **Battle-Specific Winners:**
-For each of the 5 battle sections ('battle1_leadership', 'battle2_products', 'battle3_funding', 'battle4_customers', 'battle5_alliances'), declare a winning team ('alpha' or 'beta') and provide a one-sentence justification.
+For EACH of the 5 battle sections ('battle1_leadership', 'battle2_products', 'battle3_funding', 'battle4_customers', 'battle5_alliances'), declare a winning team ('alpha', 'beta', or 'tie') and provide a concise one-sentence justification for your choice.
 
-Please provide your evaluation and scores in a strict JSON format. Do not add any commentary outside of the JSON object. The JSON object should look like this:
+Please provide your evaluation in a strict JSON format. Do not add any commentary outside of the JSON object. The root of the response must be a valid JSON object.
 
 \`\`\`json
 {
@@ -101,7 +101,7 @@ Please provide your evaluation and scores in a strict JSON format. Do not add an
   ]
 }
 \`\`\`
-Fill in the numeric scores and string reasoning based on your expert analysis. The scores for each category must be within their maximum point value (60, 15, 15, 10).`;
+Fill in the numeric scores and string reasoning based on your expert analysis. The total score for each team is the sum of the four categories. The \`winning_team_reasoning\` should be your final verdict on the overall winner.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -112,8 +112,7 @@ Fill in the numeric scores and string reasoning based on your expert analysis. T
       },
     });
 
-    // FIX: Use the .text property to get the response text directly.
-    const jsonString = response.text?.trim() || '';
+    const jsonString = response.text.trim();
     const cleanedJson = jsonString.replace(/^```json\s*|```\s*$/g, '');
     return JSON.parse(cleanedJson) as AIScoreResult;
   } catch (error) {
@@ -122,7 +121,6 @@ Fill in the numeric scores and string reasoning based on your expert analysis. T
   }
 };
 
-// FIX: Export 'fetchAiAssistedData' function to be used for the AI Assist feature in the War Room.
 export const fetchAiAssistedData = async (
   companyName: string,
   fieldLabel: string
@@ -145,8 +143,7 @@ export const fetchAiAssistedData = async (
       contents: prompt,
     });
 
-    // FIX: Use the .text property to get the response text directly.
-    return response.text?.trim() || null;
+    return response.text.trim();
   } catch (error) {
     console.error(`Error fetching AI-assisted data for ${fieldLabel}:`, error);
     return null;

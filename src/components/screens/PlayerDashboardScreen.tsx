@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import Card from '../ui/Card';
-import Button from '../ui/Button';
-import { Mission, MissionStatus, User, UserRole } from '../../types';
-import { useNavigate } from 'react-router-dom';
-import { Target, Users, Clock, Trophy, Zap, AlertCircle, Play, Eye, Crown, Shield, BarChart3, Calendar, ChevronRight, TrendingUp } from '../icons';
-import { db } from '../../lib/db';
+import Card from '../ui/Card.tsx';
+import Button from '../ui/Button.tsx';
+import { Mission, MissionStatus, User, UserRole } from '../../types.ts';
+import { Link, useNavigate } from 'react-router-dom';
+import { Target, Users, Clock, Trophy, Zap, AlertCircle, Play, Eye, Crown, Shield, BarChart3, Calendar, ChevronRight, TrendingUp } from '../icons.tsx';
+import { db } from '../../lib/db.ts';
 import { motion } from 'framer-motion';
 
 const DashboardScreen: React.FC = () => {
@@ -158,6 +158,26 @@ const DashboardScreen: React.FC = () => {
                               <div className="flex items-center gap-2 text-yellow-400"><Calendar className="w-4 h-4" /><span>{new Date(mission.mission_start_time).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span></div>
                            )}
                         </div>
+                         {mission.status === MissionStatus.COMPLETED && (
+                            <div className="mt-4 pt-4 border-t border-panel-border">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <p className="text-xs text-gray-400 uppercase font-semibold">Result</p>
+                                        <p className={`text-lg font-bold ${mission.winner_team === 'alpha' ? 'text-team-alpha' : mission.winner_team === 'beta' ? 'text-team-beta' : 'text-gray-300'}`}>
+                                            Team {mission.winner_team?.toUpperCase()} {mission.winner_team !== 'tie' ? 'Victory' : 'Stalemate'}
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-xs text-gray-400 uppercase font-semibold">Score</p>
+                                        <p className="font-mono text-lg">
+                                            <span className="text-team-alpha">{mission.team_alpha_score ?? 'N/A'}</span>
+                                            <span> - </span>
+                                            <span className="text-team-beta">{mission.team_beta_score ?? 'N/A'}</span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                       </div>
                       <div className="mt-6">
                         {isAdmin ? null : mission.status === MissionStatus.RECRUITING ? (
@@ -170,7 +190,7 @@ const DashboardScreen: React.FC = () => {
                             </Button>
                         ) : mission.status === MissionStatus.COMPLETED ? (
                             <Button onClick={() => navigate(`/mission-results/${mission.id}`)} variant="outline" className="w-full">
-                                View Debriefing <Eye className="w-4 h-4 ml-2"/>
+                                View Results <Eye className="w-4 h-4 ml-2"/>
                             </Button>
                         ) : null}
                       </div>

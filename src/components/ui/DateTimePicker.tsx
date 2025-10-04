@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, ArrowLeft, ChevronRight } from '../icons';
-import Button from './Button';
+import { Calendar, ArrowLeft, ChevronRight } from '../icons.tsx';
+import Button from './Button.tsx';
 
 const formatDateTime = (date: Date | null): string => {
-  if (!date) return 'mm/dd/yyyy --:--';
+  if (!date) return 'Pick a date and time';
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const day = date.getDate().toString().padStart(2, '0');
   const year = date.getFullYear();
@@ -37,10 +37,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ label, selected, onChan
     });
 
     const pickerRef = useRef<HTMLDivElement>(null);
-    const hourListRef = useRef<HTMLDivElement>(null);
-    const minuteListRef = useRef<HTMLDivElement>(null);
 
-    // Sync internal time state when `selected` prop changes
     useEffect(() => {
         if (selected) {
             const h = selected.getHours();
@@ -53,7 +50,6 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ label, selected, onChan
         }
     }, [selected]);
     
-    // Handle closing picker on outside click
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
@@ -63,22 +59,6 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ label, selected, onChan
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
-
-    // Scroll selected time into view when picker opens
-    useEffect(() => {
-        if (isOpen) {
-            setTimeout(() => {
-                if (hourListRef.current) {
-                    const el = hourListRef.current.querySelector<HTMLButtonElement>(`[data-hour="${time.hour}"]`);
-                    if (el) el.scrollIntoView({ block: 'center' });
-                }
-                if (minuteListRef.current) {
-                    const el = minuteListRef.current.querySelector<HTMLButtonElement>(`[data-minute="${time.minute}"]`);
-                    if (el) el.scrollIntoView({ block: 'center' });
-                }
-            }, 50); // Timeout to allow DOM to render
-        }
-    }, [isOpen, time.hour, time.minute]);
 
     const handleDateSelect = (date: Date) => {
         let hour = time.hour;
@@ -90,7 +70,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ label, selected, onChan
     
     const handleTimeSelect = (newTime: { hour: number; minute: number; period: 'AM' | 'PM'}) => {
         setTime(newTime);
-        const dateBase = viewDate;
+        const dateBase = selected || viewDate;
         const newDate = new Date(dateBase);
         let hour = newTime.hour;
         if (newTime.period === 'PM' && hour < 12) hour += 12;
@@ -130,7 +110,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ label, selected, onChan
                     <Button type="button" variant="ghost" size="icon" onClick={() => setViewDate(new Date(year, month + 1, 1))}><ChevronRight className="w-4 h-4" /></Button>
                 </div>
                 <div className="grid grid-cols-7 text-center text-xs text-gray-400 mb-2">
-                    {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => <div key={d}>{d}</div>)}
+                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => <div key={d}>{d}</div>)}
                 </div>
                 <div className="grid grid-cols-7 gap-1">
                     {weeks.flat().map((day, i) => (
@@ -139,18 +119,13 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ label, selected, onChan
                             key={i}
                             disabled={!day}
                             onClick={() => day && handleDateSelect(new Date(year, month, day))}
-                            className={`w-8 h-8 rounded-full text-sm transition-colors ${!day ? 'cursor-default' : 'hover:bg-accent hover:text-background'}
-                            ${selected && day === selected.getDate() && month === selected.getMonth() && year === selected.getFullYear() ? 'bg-accent text-background' : ''}
-                            ${!selected && day === new Date().getDate() && month === new Date().getMonth() && year === new Date().getFullYear() ? 'text-accent border border-accent' : ''}
+                            className={`w-8 h-8 rounded-md text-sm transition-colors ${!day ? 'cursor-default' : 'hover:bg-accent hover:text-background'}
+                            ${selected && day === selected.getDate() && month === selected.getMonth() && year === selected.getFullYear() ? 'bg-accent text-background font-bold' : ''}
                             `}
                         >
                             {day}
                         </button>
                     ))}
-                </div>
-                 <div className="mt-4 flex justify-between">
-                    <Button type="button" variant="ghost" className="text-blue-400 hover:bg-blue-400/10" onClick={() => onChange(null)}>Clear</Button>
-                    <Button type="button" variant="ghost" className="text-blue-400 hover:bg-blue-400/10" onClick={() => handleDateSelect(new Date())}>Today</Button>
                 </div>
             </div>
         );
@@ -160,49 +135,50 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ label, selected, onChan
         const hours = Array.from({ length: 12 }, (_, i) => i + 1);
         const minutes = Array.from({ length: 60 }, (_, i) => i);
     
+        const selectClasses = "w-full bg-secondary border border-panel-border rounded-md py-1 px-2 text-primary-text focus:outline-none focus:ring-1 focus:ring-accent";
+    
         return (
-            <div className="flex items-stretch justify-center gap-2 h-48">
-                <div ref={hourListRef} className="w-16 h-full overflow-y-scroll pr-1" style={{ scrollbarWidth: 'thin' }}>
-                    {hours.map(h => (
-                        <button
-                            key={h}
-                            type="button"
-                            data-hour={h}
-                            onClick={() => handleTimeSelect({ ...time, hour: h })}
-                            className={`w-full text-center py-1.5 rounded-md text-lg transition-colors ${time.hour === h ? 'bg-accent text-background font-bold' : 'hover:bg-secondary'}`}
-                        >
-                            {String(h).padStart(2, '0')}
-                        </button>
-                    ))}
-                </div>
-                <div ref={minuteListRef} className="w-16 h-full overflow-y-scroll pr-1" style={{ scrollbarWidth: 'thin' }}>
-                    {minutes.map(m => (
-                        <button
-                            key={m}
-                            type="button"
-                            data-minute={m}
-                            onClick={() => handleTimeSelect({ ...time, minute: m })}
-                            className={`w-full text-center py-1.5 rounded-md text-lg transition-colors ${time.minute === m ? 'bg-accent text-background font-bold' : 'hover:bg-secondary'}`}
-                        >
-                            {String(m).padStart(2, '0')}
-                        </button>
-                    ))}
-                </div>
-                <div className="flex flex-col gap-2">
-                    <button
-                        type="button"
-                        onClick={() => handleTimeSelect({ ...time, period: 'AM' })}
-                        className={`px-3 py-1.5 rounded-md flex-1 text-lg transition-colors ${time.period === 'AM' ? 'bg-accent text-background font-bold' : 'bg-secondary'}`}
+             <div className="space-y-3">
+                 <div>
+                    <label className="text-xs text-gray-400" htmlFor="dt-hour">Hour</label>
+                    <select
+                        id="dt-hour"
+                        value={time.hour}
+                        onChange={(e) => handleTimeSelect({ ...time, hour: parseInt(e.target.value) })}
+                        className={selectClasses}
                     >
-                        AM
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleTimeSelect({ ...time, period: 'PM' })}
-                        className={`px-3 py-1.5 rounded-md flex-1 text-lg transition-colors ${time.period === 'PM' ? 'bg-accent text-background font-bold' : 'bg-secondary'}`}
+                        {hours.map(h => <option key={h} value={h}>{String(h).padStart(2, '0')}</option>)}
+                    </select>
+                </div>
+                <div>
+                    <label className="text-xs text-gray-400" htmlFor="dt-minute">Minute</label>
+                    <select
+                        id="dt-minute"
+                        value={time.minute}
+                        onChange={(e) => handleTimeSelect({ ...time, minute: parseInt(e.target.value) })}
+                        className={selectClasses}
                     >
-                        PM
-                    </button>
+                        {minutes.map(m => <option key={m} value={m}>{String(m).padStart(2, '0')}</option>)}
+                    </select>
+                </div>
+                 <div>
+                    <label className="text-xs text-gray-400 block mb-1">Period</label>
+                    <div className="grid grid-cols-2 gap-2">
+                        <button
+                            type="button"
+                            onClick={() => handleTimeSelect({ ...time, period: 'AM' })}
+                            className={`px-3 py-1.5 text-sm rounded-md ${time.period === 'AM' ? 'bg-accent text-background font-bold' : 'bg-secondary hover:bg-secondary-hover'}`}
+                        >
+                            AM
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleTimeSelect({ ...time, period: 'PM' })}
+                            className={`px-3 py-1.5 text-sm rounded-md ${time.period === 'PM' ? 'bg-accent text-background font-bold' : 'bg-secondary hover:bg-secondary-hover'}`}
+                        >
+                            PM
+                        </button>
+                    </div>
                 </div>
             </div>
         );
@@ -211,20 +187,19 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ label, selected, onChan
     return (
         <div className="w-full relative" ref={pickerRef}>
             <label htmlFor="datetime" className="block text-sm font-medium text-primary-text mb-1">{label}</label>
-            <div className="relative flex items-center">
-                 <input
-                    id="datetime"
-                    readOnly
-                    value={formatDateTime(selected)}
-                    onClick={() => setIsOpen(!isOpen)}
-                    className="w-full bg-secondary border border-panel-border rounded-md py-2 px-3 text-primary-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition cursor-pointer"
-                />
-                <Calendar className="absolute right-3.5 text-gray-500 pointer-events-none" />
-            </div>
+            <button
+                type="button"
+                id="datetime"
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full bg-secondary border border-panel-border rounded-md py-2 px-3 text-left text-primary-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition flex items-center gap-2"
+            >
+                <Calendar className="w-4 h-4 text-gray-400" />
+                <span>{formatDateTime(selected)}</span>
+            </button>
             {isOpen && (
                 <div className="absolute z-10 top-full mt-2 bg-panel border border-panel-border rounded-lg shadow-lg p-4 w-auto flex gap-4">
                     {renderCalendar()}
-                    <div className="border-l border-panel-border pl-4">
+                    <div className="border-l border-panel-border pl-4 w-40">
                         {renderTimePicker()}
                     </div>
                 </div>

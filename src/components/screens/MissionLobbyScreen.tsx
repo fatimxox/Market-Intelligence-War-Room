@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { User, Team, Mission, PlayerAssignment } from '../../types';
-import Card from '../ui/Card';
-import Button from '../ui/Button';
-import { Crown, ChevronRight } from '../icons';
-import { db } from '../../lib/db';
+import { User, Team, Mission, PlayerAssignment } from '../../types.ts';
+import Card from '../ui/Card.tsx';
+import Button from '../ui/Button.tsx';
+import { Crown, Users, ChevronRight } from '../icons.tsx';
+import { db } from '../../lib/db.ts';
 
 const MissionLobbyScreen: React.FC = () => {
     const { missionId } = useParams<{ missionId: string }>();
@@ -92,12 +92,14 @@ const MissionLobbyScreen: React.FC = () => {
     const TeamColumn: React.FC<{ team: Team | null, teamName: 'alpha' | 'beta' }> = ({ team, teamName }) => {
         const isLeader = currentUser.email === team?.team_leader_email;
         const canBecomeLeader = userTeam === teamName && !team?.team_leader_email;
+        const color = teamName === 'alpha' ? 'text-team-alpha' : 'text-team-beta';
+        const accentColor = teamName === 'alpha' ? 'border-team-alpha' : 'border-team-beta';
         
         return (
             <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: teamName === 'alpha' ? 0.1 : 0.2 }}>
-                <Card className={`bg-panel border-2 ${isLeader ? (teamName === 'alpha' ? 'border-team-alpha' : 'border-team-beta') : 'border-panel-border'} h-full flex flex-col`}>
+                <Card className={`bg-panel border-2 ${isLeader ? accentColor : 'border-panel-border'} h-full flex flex-col`}>
                     <div className="p-6">
-                        <h2 className={`text-2xl font-bold ${teamName === 'alpha' ? 'text-team-alpha' : 'text-team-beta'}`}>Team {teamName.toUpperCase()}</h2>
+                        <h2 className={`text-2xl font-bold ${color}`}>Team {teamName.toUpperCase()}</h2>
                         <p className="text-gray-400 text-sm">({team?.members.length || 0} / {mission.max_players_per_team}) Operatives</p>
                     </div>
                     <div className="p-6 pt-0 space-y-3 flex-grow">
@@ -105,7 +107,7 @@ const MissionLobbyScreen: React.FC = () => {
                             <div key={member.email} className="bg-secondary p-3 rounded-lg flex items-center gap-3">
                                 <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${member.email}`} alt="avatar" className="w-8 h-8 rounded-full bg-accent/20"/>
                                 <span className="font-medium">{member.display_name}</span>
-                                {team.team_leader_email === member.email && <Crown className={`w-5 h-5 ml-auto ${teamName === 'alpha' ? 'text-team-alpha' : 'text-team-beta'}`} title="Team Leader"/>}
+                                {team.team_leader_email === member.email && <Crown className={`w-5 h-5 ml-auto ${color}`} />}
                             </div>
                         ))}
                     </div>

@@ -1,62 +1,71 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import Card from '../ui/Card';
-import Button from '../ui/Button';
-import { Mission, Team, MissionStatus, User, AIScoreResult, BattleWinner } from '../../types';
-import { db } from '../../lib/db';
-import { scoreReports } from '../../services/geminiService';
-import { Award, Trophy, BarChart3, Zap, Clock, Loader, FileText } from '../icons';
-import { BATTLE_CONFIGS } from '../../constants';
-
-interface ScoreBreakdown {
-    accuracy: number;
-    sources: number;
-    presentation: number;
-    speed: number;
-}
-
-interface TeamScore {
-    total: number;
-    breakdown: ScoreBreakdown;
-    reasoning: string;
-    timeTaken: number; // in seconds
-}
+import { motion, AnimatePresence, animate } from 'framer-motion';
+import Card from '../ui/Card.tsx';
+import Button from '../ui/Button.tsx';
+import { Mission, Team, MissionStatus, User, AIScoreResult, BattleWinner, Report } from '../../types.ts';
+import { db } from '../../lib/db.ts';
+import { scoreReports } from '../../services/geminiService.ts';
+import { Award, BarChart3, Zap, Loader, FileText, Code } from '../icons.tsx';
+import { BATTLE_CONFIGS } from '../../constants.ts';
 
 type TeamStatus = 'pending' | 'submitted' | 'scoring' | 'scored';
+type Tab = 'overview' | 'battles' | 'verdict' | 'reports';
 
-const ScoreBar = ({ value, maxValue, colorClass }: { value: number, maxValue: number, colorClass: string}) => {
-    const percentage = Math.max(0, Math.min(100, (value / maxValue) * 100));
-    return (
-        <div className="w-full bg-secondary rounded-full h-4 relative overflow-hidden">
-            <motion.div 
-                className={`${colorClass} h-4 rounded-full`}
-                initial={{ width: 0 }}
-                animate={{ width: `${percentage}%` }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-            />
-            <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-background mix-blend-lighten">{Math.round(value)} / {maxValue}</span>
-        </div>
-    );
+const AnimatedCounter: React.FC<{ to: number; className?: string }> = ({ to, className }) => {
+    const nodeRef = useRef<HTMLSpanElement>(null);
+
+    useEffect(() => {
+        const node = nodeRef.current;
+        if (!node) return;
+
+        const controls = animate(0, to, {
+            duration: 1.5,
+            ease: "easeOut",
+            onUpdate(value) {
+                node.textContent = String(Math.round(value));
+            }
+        });
+        return () => controls.stop();
+    }, [to]);
+
+    return <span ref={nodeRef} className={className} />;
 };
 
-const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-};
+const ComparisonBar: React.FC<{
+    label: string;
+    valueA: number;
+    valueB: number;
+    max: number;
+}> = ({ label, valueA, valueB, max }) => {
+    const percentA = (valueA / max) * 100;
+    const percentB = (valueB / max) * 100;
 
-const TimeBar = ({ timeTaken, totalDuration, colorClass }: { timeTaken: number, totalDuration: number, colorClass: string}) => {
-    const percentage = Math.max(0, Math.min(100, (timeTaken / totalDuration) * 100));
     return (
-        <div className="w-full bg-secondary rounded-full h-4 relative overflow-hidden">
-            <motion.div 
-                className={`${colorClass} h-4 rounded-full`}
-                initial={{ width: 0 }}
-                animate={{ width: `${percentage}%` }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-            />
-            <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-background mix-blend-lighten">{formatTime(timeTaken)} / {formatTime(totalDuration)}</span>
+        <div>
+            <div className="flex justify-between items-center text-sm mb-1">
+                <span className="font-semibold text-team-alpha">{valueA.toFixed(0)}</span>
+                <span className="text-gray-300">{label}</span>
+                <span className="font-semibold text-team-beta">{valueB.toFixed(0)}</span>
+            </div>
+            <div className="flex items-center gap-1 w-full">
+                <div className="w-full bg-secondary rounded-full h-2.5" dir="rtl">
+                    <motion.div
+                        className="bg-team-alpha h-2.5 rounded-full"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${percentA}%` }}
+                        transition={{ duration: 1, ease: 'easeOut' }}
+                    />
+                </div>
+                <div className="w-full bg-secondary rounded-full h-2.5">
+                    <motion.div
+                        className="bg-team-beta h-2.5 rounded-full"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${percentB}%` }}
+                        transition={{ duration: 1, ease: 'easeOut' }}
+                    />
+                </div>
+            </div>
         </div>
     );
 };
@@ -72,71 +81,47 @@ const ResultsScreen: React.FC = () => {
     const [mission, setMission] = useState<Mission | null>(null);
     const [winner, setWinner] = useState<'alpha' | 'beta' | 'tie' | null>(null);
     
-    const [alphaScore, setAlphaScore] = useState<TeamScore | null>(null);
-    const [betaScore, setBetaScore] = useState<TeamScore | null>(null);
+    const [alphaScore, setAlphaScore] = useState<AIScoreResult['team_alpha_score'] | null>(null);
+    const [betaScore, setBetaScore] = useState<AIScoreResult['team_beta_score'] | null>(null);
     const [alphaStatus, setAlphaStatus] = useState<TeamStatus>('pending');
     const [betaStatus, setBetaStatus] = useState<TeamStatus>('pending');
+    const [reports, setReports] = useState<{ alpha: Report | null, beta: Report | null }>({ alpha: null, beta: null });
 
     const [aiReasoning, setAiReasoning] = useState('');
     const [battleWinners, setBattleWinners] = useState<BattleWinner[]>([]);
     const [pollTrigger, setPollTrigger] = useState(0);
     const [currentUser, setCurrentUser] = useState<User | null>(null);
-    const [isScoring, setIsScoring] = useState(false);
+    const [activeTab, setActiveTab] = useState<Tab>('overview');
+    const isScoringRef = useRef(false);
 
     useEffect(() => {
         const userJson = localStorage.getItem('war-room-user');
-        if (userJson) {
-            setCurrentUser(JSON.parse(userJson));
-        }
+        if (userJson) setCurrentUser(JSON.parse(userJson));
     }, []);
 
-    const setScoresFromDetails = useCallback((details: AIScoreResult, missionData: Mission, teamAlpha: Team, teamBeta: Team) => {
+    const setScoresFromDetails = useCallback((details: AIScoreResult) => {
         setAiReasoning(details.winning_team_reasoning);
         setBattleWinners(details.battle_winners || []);
         
-        const missionStartTime = new Date(missionData.mission_start_time!).getTime();
-        const alphaTimeTaken = new Date(teamAlpha.submission_timestamp!).getTime() - missionStartTime;
-        const betaTimeTaken = new Date(teamBeta.submission_timestamp!).getTime() - missionStartTime;
-        
-        const finalAlphaBreakdown: ScoreBreakdown = { 
-            accuracy: details.team_alpha_score.accuracy_score, 
-            sources: details.team_alpha_score.sources_score, 
-            presentation: details.team_alpha_score.presentation_score, 
-            speed: details.team_alpha_score.speed_score
-        };
-        const finalAlphaTotal = Object.values(finalAlphaBreakdown).reduce((sum, val) => sum + (Number.isFinite(val) ? val : 0), 0);
-        setAlphaScore({ total: finalAlphaTotal, breakdown: finalAlphaBreakdown, reasoning: details.team_alpha_score.reasoning, timeTaken: Math.round(alphaTimeTaken/1000) });
+        setAlphaScore(details.team_alpha_score);
+        setBetaScore(details.team_beta_score);
         setAlphaStatus('scored');
-
-        const finalBetaBreakdown: ScoreBreakdown = {
-            accuracy: details.team_beta_score.accuracy_score,
-            sources: details.team_beta_score.sources_score,
-            presentation: details.team_beta_score.presentation_score,
-            speed: details.team_beta_score.speed_score
-        };
-        const finalBetaTotal = Object.values(finalBetaBreakdown).reduce((sum, val) => sum + (Number.isFinite(val) ? val : 0), 0);
-        setBetaScore({ total: finalBetaTotal, breakdown: finalBetaBreakdown, reasoning: details.team_beta_score.reasoning, timeTaken: Math.round(betaTimeTaken/1000) });
         setBetaStatus('scored');
 
+        const alphaTotal = Object.values(details.team_alpha_score).filter((v): v is number => typeof v === 'number').reduce((s, v) => s + v, 0);
+        const betaTotal = Object.values(details.team_beta_score).filter((v): v is number => typeof v === 'number').reduce((s, v) => s + v, 0);
+        
         let missionWinner: 'alpha' | 'beta' | 'tie' = 'tie';
-        if (finalAlphaTotal > finalBetaTotal) missionWinner = 'alpha';
-        if (finalBetaTotal > finalAlphaTotal) missionWinner = 'beta';
-        setWinner(missionWinner);
+        if (alphaTotal > betaTotal) missionWinner = 'alpha';
+        if (betaTotal > alphaTotal) missionWinner = 'beta';
+        
+        setTimeout(() => setWinner(missionWinner), 1600); // Delay winner reveal for animation
     }, []);
 
     const processResults = useCallback(async () => {
-        if (!missionId) {
-            setError("Mission ID not found.");
-            setLoading(false);
-            return;
-        }
-
+        if (!missionId) { setError("Mission ID not found."); setLoading(false); return; }
         const missionData = db.getMissions().find(m => m.id === missionId);
-        if (!missionData) {
-            setError("Mission not found.");
-            setLoading(false);
-            return;
-        }
+        if (!missionData) { setError("Mission not found."); setLoading(false); return; }
         setMission(missionData);
 
         const allTeams = db.getTeams();
@@ -146,60 +131,52 @@ const ResultsScreen: React.FC = () => {
         const allReports = db.getReports();
         const reportAlpha = allReports.find(r => r.mission_id === missionId && r.team_name === 'alpha');
         const reportBeta = allReports.find(r => r.mission_id === missionId && r.team_name === 'beta');
-
-        // Check for pre-existing score details
-        if (missionData.score_details && teamAlpha?.submission_timestamp && teamBeta?.submission_timestamp) {
+        setReports({ alpha: reportAlpha || null, beta: reportBeta || null });
+        
+        if (missionData.score_details && teamAlpha && teamBeta) {
             setLoadingMessage("Loading finalized scores...");
-            setScoresFromDetails(missionData.score_details, missionData, teamAlpha, teamBeta);
+            setScoresFromDetails(missionData.score_details);
             setLoading(false);
             return;
         }
         
-        // --- Status Update & Polling ---
         if (!reportAlpha || !reportBeta) {
             setLoading(false);
             setAlphaStatus(reportAlpha ? 'submitted' : 'pending');
             setBetaStatus(reportBeta ? 'submitted' : 'pending');
             const waitingFor = !reportAlpha && !reportBeta ? "teams to submit reports" : reportAlpha ? "Team Beta" : "Team Alpha";
             setLoadingMessage(`Awaiting ${waitingFor}...`);
-            setTimeout(() => setPollTrigger(p => p + 1), 5000); // Poll for reports
+            setTimeout(() => setPollTrigger(p => p + 1), 5000);
             return;
         }
 
-        // --- Final Evaluation (only when both reports are in and not yet scored) ---
-        if (reportAlpha && reportBeta && teamAlpha && teamBeta && !isScoring) {
-            setIsScoring(true);
+        if (reportAlpha && reportBeta && teamAlpha && teamBeta && !isScoringRef.current) {
+            isScoringRef.current = true;
             setLoading(true);
             setLoadingMessage("AI Analyst is comparing reports...");
             setAlphaStatus('scoring');
             setBetaStatus('scoring');
             
             if (!missionData.mission_start_time || !teamAlpha.submission_timestamp || !teamBeta.submission_timestamp) {
-                setError("Mission or team submission timestamps are missing, cannot calculate final scores accurately.");
-                setLoading(false);
-                setIsScoring(false);
-                return;
+                setError("Mission or team submission timestamps are missing."); setLoading(false); isScoringRef.current = false; return;
             }
 
             const finalScores = await scoreReports(missionData.target_company, reportAlpha.battle_data, reportBeta.battle_data, missionData, teamAlpha, teamBeta);
 
             if (!finalScores) {
-                setError("AI final comparison failed.");
-                setLoading(false);
-                setIsScoring(false);
-                return;
+                setError("AI final comparison failed."); setLoading(false); isScoringRef.current = false; return;
             }
             
-            setScoresFromDetails(finalScores, missionData, teamAlpha, teamBeta);
+            setScoresFromDetails(finalScores);
             
             if (missionData.status !== MissionStatus.COMPLETED) {
-                const alphaTotal = Object.values(finalScores.team_alpha_score).reduce((s: number, v) => typeof v === 'number' ? s + v : s, 0);
-                const betaTotal = Object.values(finalScores.team_beta_score).reduce((s: number, v) => typeof v === 'number' ? s + v : s, 0);
+                const alphaTotal = Math.round(Object.values(finalScores.team_alpha_score).filter((v): v is number => typeof v === 'number').reduce((s, v) => s + v, 0));
+                const betaTotal = Math.round(Object.values(finalScores.team_beta_score).filter((v): v is number => typeof v === 'number').reduce((s, v) => s + v, 0));
                 let finalWinner: 'alpha' | 'beta' | 'tie' = 'tie';
                 if (alphaTotal > betaTotal) finalWinner = 'alpha';
                 if (betaTotal > alphaTotal) finalWinner = 'beta';
 
-                db.updateMissions(db.getMissions().map(m => m.id === missionId ? { ...m, status: MissionStatus.COMPLETED, winner_team: finalWinner, team_alpha_score: Math.round(alphaTotal), team_beta_score: Math.round(betaTotal), score_details: finalScores } : m));
+                db.updateMissions(db.getMissions().map(m => m.id === missionId ? { ...m, status: MissionStatus.COMPLETED, winner_team: finalWinner, team_alpha_score: alphaTotal, team_beta_score: betaTotal, score_details: finalScores } : m));
                 
                 const winningTeamEmails = finalWinner !== 'tie' ? (finalWinner === 'alpha' ? teamAlpha.members : teamBeta.members).map(m => m.email) : [];
                 const allParticipantEmails = new Set([...teamAlpha.members.map(m => m.email), ...teamBeta.members.map(m => m.email)]);
@@ -207,166 +184,138 @@ const ResultsScreen: React.FC = () => {
                 const usersInDb = db.getUsers();
                 usersInDb.forEach(user => {
                     if (allParticipantEmails.has(user.email)) {
-                        const updatedUser = {
-                            ...user,
-                            // FIX: Explicitly convert to Number to prevent type errors with string concatenation.
-                            total_missions: Number(user.total_missions || 0) + 1,
-                            // FIX: Explicitly convert to Number to prevent type errors with string concatenation.
-                            missions_won: Number(user.missions_won || 0) + (winningTeamEmails.includes(user.email) ? 1 : 0)
-                        };
+                        const updatedUser = { ...user, total_missions: (user.total_missions || 0) + 1, missions_won: (user.missions_won || 0) + (winningTeamEmails.includes(user.email) ? 1 : 0) };
                         db.updateUser(updatedUser);
-
-                        if (currentUser && currentUser.id === updatedUser.id) {
-                            localStorage.setItem('war-room-user', JSON.stringify(updatedUser));
-                        }
+                        if (currentUser && currentUser.id === updatedUser.id) localStorage.setItem('war-room-user', JSON.stringify(updatedUser));
                     }
                 });
             }
             setLoading(false);
         }
 
-    }, [missionId, pollTrigger, currentUser, isScoring, setScoresFromDetails]);
+    }, [missionId, pollTrigger, currentUser, setScoresFromDetails]);
 
     useEffect(() => {
         processResults();
     }, [processResults]);
 
-    const TeamResultCard: React.FC<{ teamName: 'Alpha' | 'Beta', score: TeamScore | null, status: TeamStatus, isWinner: boolean, hasWinner: boolean, mission: Mission }> = ({ teamName, score, status, isWinner, hasWinner, mission }) => {
-        const teamSpecificClasses = {
-            Alpha: {
-                border: 'border-team-alpha shadow-team-alpha/20',
-                bg: 'bg-team-alpha',
-                text: 'text-team-alpha',
-                winner_bg: 'bg-team-alpha',
-                score_bar_400: 'bg-blue-400',
-                score_bar_500: 'bg-blue-500',
-                score_bar_600: 'bg-blue-600',
-                score_bar_700: 'bg-blue-700',
-            },
-            Beta: {
-                border: 'border-team-beta shadow-team-beta/20',
-                bg: 'bg-team-beta',
-                text: 'text-team-beta',
-                winner_bg: 'bg-team-beta',
-                score_bar_400: 'bg-red-400',
-                score_bar_500: 'bg-red-500',
-                score_bar_600: 'bg-red-600',
-                score_bar_700: 'bg-red-700',
-            }
-        };
-        const styles = teamSpecificClasses[teamName];
+    const alphaTotal = alphaScore ? Math.round(Object.values(alphaScore).filter((v): v is number => typeof v === 'number').reduce((s, v) => s + v, 0)) : 0;
+    const betaTotal = betaScore ? Math.round(Object.values(betaScore).filter((v): v is number => typeof v === 'number').reduce((s, v) => s + v, 0)) : 0;
 
-        return (
-            <motion.div 
-                initial={{ y: 20, opacity: 0 }} 
-                animate={{ y: 0, opacity: 1 }} 
-                transition={{ delay: teamName === 'Alpha' ? 0.1 : 0.2 }}
-                className="group"
-            >
-            <Card className={`bg-panel border-2 ${isWinner ? styles.border : 'border-panel-border'} ${hasWinner && !isWinner ? 'opacity-60 saturate-50 group-hover:opacity-100 group-hover:saturate-100' : ''} min-h-[620px] flex flex-col transition-all duration-500`}>
-                <div className="p-6 relative flex-grow flex flex-col">
-                    <AnimatePresence>
-                    {isWinner && (
-                        <motion.div 
-                          initial={{scale:0, rotate: -20, y: -20}} 
-                          animate={{scale:1, rotate:0, y: 0}} 
-                          transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-                          className={`absolute -top-5 -left-5 ${styles.winner_bg} text-background px-4 py-2 rounded-lg text-sm font-bold transform -rotate-12 flex items-center gap-2 z-10`}
-                        >
-                          <Trophy/> WINNER
-                        </motion.div>
-                    )}
-                    </AnimatePresence>
+    const TABS: { id: Tab, label: string, icon: React.FC<React.SVGProps<SVGSVGElement>> }[] = [
+        { id: 'overview', label: 'Score Breakdown', icon: BarChart3 },
+        { id: 'battles', label: 'Battlefield Analysis', icon: Zap },
+        { id: 'verdict', label: 'AI Verdict', icon: FileText },
+        { id: 'reports', label: 'View Reports', icon: Code },
+    ];
 
-                    <h2 className={`text-3xl font-bold ${styles.text} mb-2`}>Team {teamName}</h2>
-
-                    {status === 'pending' && <div className="flex-grow flex flex-col items-center justify-center text-gray-500"><Clock className="w-8 h-8 mb-2"/><span>Waiting for submission...</span></div>}
-                    {status === 'submitted' && <div className="flex-grow flex flex-col items-center justify-center text-center text-gray-400"><FileText className="w-8 h-8 mb-2"/><span>Report Submitted.<br/>Awaiting opponent.</span></div>}
-                    {status === 'scoring' && <div className="flex-grow flex flex-col items-center justify-center text-accent"><Loader className="w-8 h-8 mb-2 animate-spin"/><span>AI analysis in progress...</span></div>}
-                    
-                    {status === 'scored' && score && (
-                        <>
-                            <p className="text-5xl font-bold mb-6">{Math.round(score.total)} <span className="text-2xl text-gray-400">/ 100</span></p>
-
-                            <div className="mb-6">
-                                <p className="text-sm font-medium mb-1 flex items-center gap-2"><Clock className="w-4 h-4 text-gray-400" /><span>Time Utilized</span></p>
-                                <TimeBar timeTaken={score.timeTaken} totalDuration={mission.time_limit_minutes * 60} colorClass={`bg-gray-500`} />
-                            </div>
-
-                            <div className="space-y-4">
-                                <div><p className="text-sm font-medium mb-1 flex justify-between">Data Accuracy & Completeness <span className="text-gray-400">60%</span></p><ScoreBar value={score.breakdown.accuracy} maxValue={60} colorClass={styles.score_bar_400} /></div>
-                                <div><p className="text-sm font-medium mb-1 flex justify-between">Source Links <span className="text-gray-400">15%</span></p><ScoreBar value={score.breakdown.sources} maxValue={15} colorClass={styles.score_bar_500} /></div>
-                                <div><p className="text-sm font-medium mb-1 flex justify-between">Teamwork & Presentation <span className="text-gray-400">15%</span></p><ScoreBar value={score.breakdown.presentation} maxValue={15} colorClass={styles.score_bar_600} /></div>
-                                <div><p className="text-sm font-medium mb-1 flex justify-between">Speed Score <span className="text-gray-400">10%</span></p><ScoreBar value={score.breakdown.speed} maxValue={10} colorClass={styles.score_bar_700} /></div>
-                            </div>
-
-                            <div className="mt-6 pt-4 border-t border-panel-border"><h4 className="font-semibold text-gray-400 text-sm mb-2">AI Analyst's Notes:</h4><p className="text-sm text-gray-300 italic">"{score.reasoning}"</p></div>
-                        </>
-                    )}
-                </div>
-            </Card>
-            </motion.div>
-        );
-    };
-
-    if (loading) return (
+    if (loading || (!alphaScore && !error)) return (
         <div className="flex flex-col gap-4 justify-center items-center h-full">
-            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}>
-                <Zap className="w-16 h-16 text-accent" />
-            </motion.div>
+            <Loader className="w-16 h-16 text-accent animate-spin" />
             <p className="text-xl font-semibold text-gray-300">{loadingMessage}</p>
         </div>
     );
     if (error) return <div className="p-6 text-center text-red-400">{error}</div>;
 
-    const hasWinner = winner !== null && winner !== 'tie';
-
     return (
-        <div className="p-6">
-            <header className="text-center mb-8">
+        <div className="p-8 min-h-screen">
+            <motion.header initial={{ opacity: 0, y: -30 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
                 <div className="inline-block bg-accent/10 p-4 rounded-full mb-4"><Award className="w-12 h-12 text-accent" /></div>
                 <h1 className="text-4xl font-bold">Mission Debriefing</h1>
                 <p className="text-gray-400">Target: <span className="font-medium text-accent">{mission?.target_company}</span></p>
-            </header>
+            </motion.header>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl mx-auto">
-                {mission && <TeamResultCard teamName="Alpha" score={alphaScore} status={alphaStatus} isWinner={winner === 'alpha'} hasWinner={hasWinner} mission={mission}/>}
-                {mission && <TeamResultCard teamName="Beta" score={betaScore} status={betaStatus} isWinner={winner === 'beta'} hasWinner={hasWinner} mission={mission} />}
-            </div>
+            <Card className="max-w-5xl mx-auto bg-panel/80 border-panel-border backdrop-blur-sm">
+                <div className="p-8">
+                    <div className="grid grid-cols-3 items-center text-center mb-8">
+                        <motion.div initial={{ x: -50, opacity: 0 }} animate={{ x: 0, opacity: 1, transition: { delay: 0.5 } }} className={`p-4 rounded-lg ${winner === 'alpha' ? 'bg-secondary' : ''}`}>
+                            <h2 className="text-3xl font-bold text-team-alpha">Team Alpha</h2>
+                            <AnimatePresence>
+                                {winner === 'alpha' && <motion.p initial={{scale:0.5, opacity:0}} animate={{scale:1, opacity:1}} className="text-lg font-bold text-accent tracking-widest">WINNER</motion.p>}
+                            </AnimatePresence>
+                        </motion.div>
 
-            {winner === 'tie' && <p className="text-center text-2xl font-bold text-accent mt-8">Mission Result: TIE</p>}
-            
-            <AnimatePresence>
-            {winner && (
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-                    <Card className="max-w-4xl mx-auto mt-8 bg-panel border-panel-border">
-                        <div className="p-6">
-                            <h3 className="text-xl font-bold text-accent mb-3 flex items-center gap-2"><BarChart3/>Battlefield Breakdown</h3>
-                            <div className="space-y-4 mt-4">
-                                {battleWinners.map(bw => {
-                                    const config = BATTLE_CONFIGS[bw.battle as keyof typeof BATTLE_CONFIGS];
-                                    const IconComponent = config.icon;
-                                    const winnerColor = bw.winner === 'alpha' ? 'text-team-alpha' : bw.winner === 'beta' ? 'text-team-beta' : 'text-gray-400';
-                                    return (
-                                        <div key={bw.battle} className="bg-secondary p-4 rounded-lg flex items-center gap-4">
-                                            <IconComponent className={`w-8 h-8 flex-shrink-0 ${config.color}`} />
-                                            <div className="flex-grow"><h4 className="font-bold">{config.name.split(':')[1]}</h4><p className="text-sm text-gray-400 italic">"{bw.reasoning}"</p></div>
-                                            <div className="text-right flex-shrink-0 w-24"><p className="text-xs text-gray-500">WINNER</p><p className={`font-bold ${winnerColor}`}>Team {bw.winner.toUpperCase()}</p></div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                        <div className="font-mono flex items-baseline justify-center gap-4">
+                            <AnimatedCounter to={alphaTotal} className="text-7xl font-bold text-team-alpha" />
+                            <span className="text-4xl text-gray-500">:</span>
+                            <AnimatedCounter to={betaTotal} className="text-7xl font-bold text-team-beta" />
                         </div>
-                    </Card>
 
-                    {aiReasoning && (
-                        <Card className="max-w-4xl mx-auto mt-8 bg-panel border-panel-border">
-                            <div className="p-6"><h3 className="text-xl font-bold text-accent mb-3 flex items-center gap-2"><Zap/>AI's Final Verdict</h3><p className="text-gray-300">{aiReasoning}</p></div>
-                        </Card>
-                    )}
-                </motion.div>
-            )}
-            </AnimatePresence>
+                        <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1, transition: { delay: 0.5 } }} className={`p-4 rounded-lg ${winner === 'beta' ? 'bg-secondary' : ''}`}>
+                             <h2 className="text-3xl font-bold text-team-beta">Team Beta</h2>
+                            <AnimatePresence>
+                                {winner === 'beta' && <motion.p initial={{scale:0.5, opacity:0}} animate={{scale:1, opacity:1}} className="text-lg font-bold text-accent tracking-widest">WINNER</motion.p>}
+                            </AnimatePresence>
+                        </motion.div>
+                    </div>
+
+                    <div className="border-b border-panel-border flex justify-center mb-6">
+                        {TABS.map(tab => (
+                            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`relative px-4 py-3 text-sm font-semibold flex items-center gap-2 transition-colors ${activeTab === tab.id ? 'text-accent' : 'text-gray-400 hover:text-primary-text'}`}>
+                                <tab.icon className="w-4 h-4" /> {tab.label}
+                                {activeTab === tab.id && <motion.div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent" layoutId="underline" />}
+                            </button>
+                        ))}
+                    </div>
+
+                    <AnimatePresence mode="wait">
+                        <motion.div key={activeTab} initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -10, opacity: 0 }} transition={{ duration: 0.2 }}>
+                            {activeTab === 'overview' && alphaScore && betaScore && (
+                                <div className="space-y-6 mt-4">
+                                    <ComparisonBar label="Accuracy & Insight" valueA={alphaScore.accuracy_score} valueB={betaScore.accuracy_score} max={60} />
+                                    <ComparisonBar label="Sources" valueA={alphaScore.sources_score} valueB={betaScore.sources_score} max={15} />
+                                    <ComparisonBar label="Presentation" valueA={alphaScore.presentation_score} valueB={betaScore.presentation_score} max={15} />
+                                    <ComparisonBar label="Speed" valueA={alphaScore.speed_score} valueB={betaScore.speed_score} max={10} />
+                                </div>
+                            )}
+                            {activeTab === 'battles' && (
+                                <div className="space-y-3 mt-4">
+                                    {battleWinners.map(bw => {
+                                        const config = BATTLE_CONFIGS[bw.battle as keyof typeof BATTLE_CONFIGS];
+                                        return (
+                                            <div key={bw.battle} className="bg-secondary p-3 rounded-lg flex items-center gap-4">
+                                                <config.icon className={`w-6 h-6 flex-shrink-0 ${config.color}`} />
+                                                <div className="flex-grow"><h4 className="font-semibold">{config.name.split(':')[1]}</h4><p className="text-xs text-gray-400 italic">"{bw.reasoning}"</p></div>
+                                                <div className={`text-right flex-shrink-0 w-28 font-bold text-sm ${bw.winner === 'alpha' ? 'text-team-alpha' : bw.winner === 'beta' ? 'text-team-beta' : 'text-gray-400'}`}>Team {bw.winner.toUpperCase()}</div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                             {activeTab === 'verdict' && (
+                                <div className="mt-4 space-y-6">
+                                    <div>
+                                        <h4 className="font-bold text-accent text-lg mb-2">Final Verdict</h4>
+                                        <p className="text-gray-300 leading-relaxed">{aiReasoning}</p>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="bg-secondary p-4 rounded-lg">
+                                            <h5 className="font-semibold text-team-alpha mb-1">Team Alpha Analysis</h5>
+                                            <p className="text-sm text-gray-400 italic">"{alphaScore?.reasoning}"</p>
+                                        </div>
+                                         <div className="bg-secondary p-4 rounded-lg">
+                                            <h5 className="font-semibold text-team-beta mb-1">Team Beta Analysis</h5>
+                                            <p className="text-sm text-gray-400 italic">"{betaScore?.reasoning}"</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            {activeTab === 'reports' && (
+                                <div className="mt-4 grid grid-cols-2 gap-4 h-[400px]">
+                                    <div className="bg-secondary rounded-lg p-2 flex flex-col">
+                                        <h4 className="font-bold text-team-alpha p-2">Team Alpha Report</h4>
+                                        <pre className="text-xs overflow-auto flex-grow bg-background rounded p-2 font-mono">{JSON.stringify(reports.alpha?.battle_data, null, 2)}</pre>
+                                    </div>
+                                    <div className="bg-secondary rounded-lg p-2 flex flex-col">
+                                        <h4 className="font-bold text-team-beta p-2">Team Beta Report</h4>
+                                        <pre className="text-xs overflow-auto flex-grow bg-background rounded p-2 font-mono">{JSON.stringify(reports.beta?.battle_data, null, 2)}</pre>
+                                    </div>
+                                </div>
+                            )}
+                        </motion.div>
+                    </AnimatePresence>
+                </div>
+            </Card>
 
             <div className="text-center mt-12">
                 <Button onClick={() => navigate('/dashboard')} variant="primary" size="lg">Return to Dashboard</Button>

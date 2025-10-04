@@ -1,11 +1,15 @@
 
+
+
 import { GoogleGenAI } from "@google/genai";
 import { IntelligenceData, Mission, Team } from '../types.ts';
 
 const getApiKey = () => {
-  const key = import.meta.env.VITE_API_KEY;
+  // FIX: Use process.env.API_KEY as required by the guidelines.
+  const key = process.env.API_KEY;
   if (!key) {
-    console.warn("VITE_API_KEY environment variable not set. AI features will not work.");
+    // FIX: Updated warning message to refer to the correct environment variable.
+    console.warn("API_KEY environment variable not set. AI features will not work.");
     return null;
   }
   return key;
@@ -129,6 +133,7 @@ Please provide your evaluation and scores in a strict JSON format. Do not add an
 Fill in the numeric scores and string reasoning based on your expert analysis. The scores for each category must be within their maximum point value (60, 15, 15, 10).`;
 
   try {
+    // FIX: Use the recommended 'gemini-2.5-flash' model instead of the deprecated 'gemini-1.5-flash'.
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
@@ -138,7 +143,7 @@ Fill in the numeric scores and string reasoning based on your expert analysis. T
     });
 
     // FIX: Use the .text property to get the response text directly.
-    const jsonString = response.text?.trim() || '';
+    const jsonString = response.text.trim();
     const cleanedJson = jsonString.replace(/^```json\s*|```\s*$/g, '');
     return JSON.parse(cleanedJson) as AIScoreResult;
   } catch (error) {
@@ -165,13 +170,14 @@ export const fetchAiAssistedData = async (
   Provide a concise answer containing only the requested information. If the information is not publicly available or cannot be found, respond with "Not publicly available". Do not add any extra commentary or explanation.`;
 
   try {
+    // FIX: Use the recommended 'gemini-2.5-flash' model instead of the deprecated 'gemini-1.5-flash'.
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
     });
 
     // FIX: Use the .text property to get the response text directly.
-    return response.text?.trim() || null;
+    return response.text.trim();
   } catch (error) {
     console.error(`Error fetching AI-assisted data for ${fieldLabel}:`, error);
     return null;

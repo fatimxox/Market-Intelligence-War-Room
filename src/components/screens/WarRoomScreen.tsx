@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { IntelligenceData, User, Team, Mission, BattleRole, ChatMessage, Report, MissionStatus, PlayerAssignment } from '../../types';
-import { BATTLE_CONFIGS, initializeBattleData, ROLE_BATTLE_MAP, emptyFounder, emptyExecutive, emptyCompetitivePosition, emptyGeographicFootprint, emptyProductLine, emptyPricingChange, emptyPlatform, emptyInfluencerPartnership, emptyFundingRound, emptyInvestor, emptyB2CSegment, emptyB2BSegment, emptyPainPoint, emptyStrategicPartner, emptyKeySupplier, emptyExpansion, QUICK_TOOLS } from '../../constants';
-import { Send, Plus, XCircle, MagicWandIcon, MessageCircleIcon, Clock, Loader } from '../icons';
-import Input from '../ui/Input';
-import Button from '../ui/Button';
-import Modal from '../ui/Modal';
+import { IntelligenceData, User, Team, Mission, BattleRole, ChatMessage, Report, MissionStatus, PlayerAssignment } from '../../types.ts';
+import { BATTLE_CONFIGS, initializeBattleData, ROLE_BATTLE_MAP, emptyFounder, emptyExecutive, emptyCompetitivePosition, emptyGeographicFootprint, emptyProductLine, emptyPricingChange, emptyPlatform, emptyInfluencerPartnership, emptyFundingRound, emptyInvestor, emptyB2CSegment, emptyB2BSegment, emptyPainPoint, emptyStrategicPartner, emptyKeySupplier, emptyExpansion } from '../../constants.ts';
+import { Send, Plus, XCircle, MagicWandIcon, MessageCircleIcon, Clock, Loader } from '../icons.tsx';
+import Input from '../ui/Input.tsx';
+import Button from '../ui/Button.tsx';
+import Modal from '../ui/Modal.tsx';
 import { motion, AnimatePresence } from 'framer-motion';
-import { db } from '../../lib/db';
-import { fetchAiAssistedData } from '../../services/geminiService';
+import { db } from '../../lib/db.ts';
+import { fetchAiAssistedData } from '../../services/geminiService.ts';
 
 // --- HELPER COMPONENTS ---
 
@@ -27,26 +27,6 @@ const AIHelperButton = ({ fieldPath, fieldLabel, isLoading, onAiAssist }: { fiel
             )}
         </button>
     );
-};
-
-const QuickTools = ({ companyName, topic }: { companyName: string; topic: string }) => {
-    return (
-        <div className="flex items-center gap-2 mb-3">
-            <span className="text-xs font-semibold text-gray-400">Quick Search:</span>
-            {Object.entries(QUICK_TOOLS).map(([key, tool]) => {
-                const IconComponent = tool.icon;
-                const url = `${tool.url}${encodeURIComponent(`${companyName} ${topic}`)}`;
-                return (
-                    <a href={url} target="_blank" rel="noopener noreferrer" key={key}>
-                        <Button variant="outline" size="sm" className="flex items-center gap-1.5 py-1 px-2 text-xs">
-                            <IconComponent className="w-3 h-3" />
-                            {tool.name}
-                        </Button>
-                    </a>
-                )
-            })}
-        </div>
-    )
 };
 
 const SectionHeader = ({ children, progress }: { children?: React.ReactNode, progress: number }) => (
@@ -127,9 +107,9 @@ const EditableTable = ({ data, columns, rows, onInputChange, isEditable, path, o
 );
 
 const EditableForm = ({ data, fields, onInputChange, isEditable, path, aiLoadingFields, onAiAssist }: any) => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
         {fields.map((field: any) => (
-            <div key={field.key} className={field.fullWidth ? 'lg:col-span-4' : (field.halfWidth ? 'lg:col-span-2' : '')}>
+            <div key={field.key} className={field.fullWidth ? 'md:col-span-2' : ''}>
                 <label className="block text-sm font-medium text-gray-300 mb-1">{field.label}</label>
                 <div className="relative">
                     <input
@@ -309,15 +289,9 @@ const WarRoomScreen: React.FC = () => {
         navigate(`/mission-results/${missionId}`);
     }, [mission, team, intelligenceData, navigate, missionId, teamName]);
 
-    const handleSubmitReportRef = useRef(handleSubmitReport);
-    useEffect(() => {
-        handleSubmitReportRef.current = handleSubmitReport;
-    }, [handleSubmitReport]);
-
     // Timer Countdown Effect
     useEffect(() => {
         if (!mission || !mission.mission_start_time || team?.report_submitted) {
-            if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             setTimeLeft(null);
             return;
         }
@@ -334,7 +308,7 @@ const WarRoomScreen: React.FC = () => {
                 setTimeLeft(0);
                 if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
                 if (isLeader && !team?.report_submitted) {
-                    handleSubmitReportRef.current();
+                    handleSubmitReport();
                 }
             } else {
                 setTimeLeft(remaining);
@@ -348,14 +322,13 @@ const WarRoomScreen: React.FC = () => {
             }
         };
 
-        if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
         updateTimer();
         timerIntervalRef.current = window.setInterval(updateTimer, 1000);
 
         return () => {
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
         };
-    }, [mission, team?.report_submitted, isLeader]);
+    }, [mission, team, isLeader, handleSubmitReport]);
 
     useEffect(() => {
         const user = JSON.parse(localStorage.getItem('war-room-user') || '{}');
@@ -388,17 +361,7 @@ const WarRoomScreen: React.FC = () => {
         
         if (user && foundTeam) {
             const userInTeam = foundTeam.members.find(m => m.email === user.email);
-            const role = userInTeam?.battle_role || null;
-            setUserRole(role);
-            
-            // Auto-navigate to assigned battle tab
-            if (role) {
-                const battleKey = ROLE_BATTLE_MAP[role];
-                const battleIndex = Object.keys(BATTLE_CONFIGS).indexOf(battleKey);
-                if (battleIndex !== -1) {
-                    setActiveTab(`B${battleIndex + 1}`);
-                }
-            }
+            setUserRole(userInTeam?.battle_role || null);
         }
 
         if (missionId && teamName) {
@@ -516,7 +479,7 @@ const WarRoomScreen: React.FC = () => {
     useEffect(() => {
         const newProgress: Record<string, number> = {};
         Object.keys(BATTLE_CONFIGS).forEach(battleKey => {
-            const dataKey = battleKey as keyof IntelligenceData;
+            const dataKey = battleKey as keyof Omit<IntelligenceData, 'companyName' | 'companyBrief'>;
             if (typeof intelligenceData[dataKey] === 'object' && intelligenceData[dataKey] !== null) {
                 newProgress[battleKey] = getCompletionPercentage(intelligenceData[dataKey]);
             }
@@ -596,7 +559,7 @@ const WarRoomScreen: React.FC = () => {
                 <header className="flex-shrink-0 bg-panel border-b border-panel-border p-4 flex justify-between items-center z-10">
                     <div>
                         <h1 className="text-2xl font-bold text-primary-text">Mission: <span className="text-accent">{mission.title}</span></h1>
-                        <p className="text-sm text-gray-400">Target: <span className="font-medium text-primary-text">{mission.target_company}</span> | Team: <span className={`font-bold text-${teamColorClass}`}>{team.team_name.toUpperCase()}</span></p>
+                        <p className="text-sm text-gray-400">Target: <span className="font-medium text-primary-text">{intelligenceData.companyName}</span> | Team: <span className={`font-bold ${teamColorClass}`}>{team.team_name.toUpperCase()}</span></p>
                     </div>
                     <div className="flex items-center gap-4">
                         <div className={`font-mono text-2xl font-bold ${getTimerColor(timeLeft)} flex items-center gap-2`}>
@@ -608,19 +571,6 @@ const WarRoomScreen: React.FC = () => {
                         {team.report_submitted && <span className="px-3 py-1.5 bg-green-500/20 text-green-300 rounded-md text-sm font-semibold">Report Submitted</span>}
                     </div>
                 </header>
-
-                <div className="p-6 border-b border-panel-border">
-                    <label htmlFor="companyBrief" className="block text-sm font-semibold text-gray-300 mb-2">Company Brief</label>
-                    <textarea
-                        id="companyBrief"
-                        rows={3}
-                        value={intelligenceData.companyBrief}
-                        onChange={(e) => handleInputChange('companyBrief', e.target.value)}
-                        disabled={team?.report_submitted}
-                        className="w-full bg-secondary border border-panel-border rounded-md px-3 py-2 text-primary-text placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-panel disabled:cursor-not-allowed"
-                        placeholder="Provide a concise overview of the target company..."
-                    />
-                </div>
                 
                 <div className="flex-shrink-0 bg-secondary border-b border-panel-border flex items-center justify-between px-6">
                     <nav className="flex space-x-2">
@@ -650,132 +600,103 @@ const WarRoomScreen: React.FC = () => {
                                {BATTLE_CONFIGS.battle1_leadership.name}
                            </SectionHeader>
                            <SubSection title="Founders">
-                                <QuickTools companyName={intelligenceData.companyName} topic="founders"/>
                                 <EditableTable data={intelligenceData.battle1_leadership.founders} columns={intelligenceData.battle1_leadership.founders.map((_, i) => `Founder ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle1_leadership')} path="battle1_leadership.founders" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'fullName', label: 'Full Name'}, {key: 'foundingYear', label: 'Founding Year'}, {key: 'currentRole', label: 'Current Role'}, {key: 'previousVentures', label: 'Previous Ventures'}, {key: 'contactEmail', label: 'Contact Email'}, {key: 'linkedinUrl', label: 'LinkedIn URL'}, {key: 'phoneNo', label: 'Phone No.'}, {key: 'sourceLink', label: 'Source Link'}, {key: 'notes', label: 'Notes'} ]} />
                                 {isBattleEditable('battle1_leadership') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle1_leadership.founders', emptyFounder)}><Plus className="w-4 h-4 mr-1"/>Add Founder</Button>}
                             </SubSection>
-                           <SubSection title="Key Executives">
-                                <QuickTools companyName={intelligenceData.companyName} topic="key executives"/>
+                           <SubSection title="Executives">
                                 <EditableTable data={intelligenceData.battle1_leadership.executives} columns={intelligenceData.battle1_leadership.executives.map((_, i) => `Executive ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle1_leadership')} path="battle1_leadership.executives" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'name', label: 'Name'}, {key: 'title', label: 'Title'}, {key: 'function', label: 'Function'}, {key: 'yearsWithFirm', label: 'Yrs w/ Firm'}, {key: 'contactEmail', label: 'Contact Email'}, {key: 'linkedinUrl', label: 'LinkedIn URL'}, {key: 'phoneNo', label: 'Phone No.'}, {key: 'sourceLink', label: 'Source Link'}, {key: 'notes', label: 'Notes'} ]} />
                                 {isBattleEditable('battle1_leadership') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle1_leadership.executives', emptyExecutive)}><Plus className="w-4 h-4 mr-1"/>Add Executive</Button>}
                             </SubSection>
-                            <SubSection title="Market Share">
-                                <QuickTools companyName={intelligenceData.companyName} topic="market size TAM SAM SOM"/>
-                                <EditableForm data={intelligenceData.battle1_leadership.marketSize} onInputChange={handleInputChange} isEditable={isBattleEditable('battle1_leadership')} path="battle1_leadership.marketSize" aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} fields={[ { key: 'tam', label: 'TAM (USD)' }, { key: 'sam', label: 'SAM (USD)' }, { key: 'som', label: 'SOM (USD)' }, { key: 'annualGrowthRate', label: 'Annual Growth Rate %' }, { key: 'notes', label: 'Notes', fullWidth: true }, { key: 'sourceLink', label: 'Source Link', fullWidth: true } ]}/>
+                             <SubSection title="Market Size">
+                                <EditableForm data={intelligenceData.battle1_leadership.marketSize} onInputChange={handleInputChange} isEditable={isBattleEditable('battle1_leadership')} path="battle1_leadership.marketSize" aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} fields={[ {key: 'tam', label: 'TAM'}, {key: 'sam', label: 'SAM'}, {key: 'som', label: 'SOM'}, {key: 'annualGrowthRate', label: 'Annual Growth Rate'}, {key: 'sourceLink', label: 'Source Link'}, {key: 'notes', label: 'Notes', fullWidth: true} ]} />
                             </SubSection>
-                            <SubSection title="Competitive Position">
-                                <QuickTools companyName={intelligenceData.companyName} topic="competitive position"/>
-                                <EditableTable data={intelligenceData.battle1_leadership.competitivePosition} columns={intelligenceData.battle1_leadership.competitivePosition.map((c, i) => c.company || `Competitor ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle1_leadership')} path="battle1_leadership.competitivePosition" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'rank', label: 'Rank'}, {key: 'company', label: 'Company'}, {key: 'share', label: 'Share %'}, {key: 'differentiators', label: 'Differentiators'}, {key: 'benchmarks', label: 'Benchmarks'}, {key: 'sourceLink', label: 'Source Link'} ]}/>
+                            <SubSection title="Competitive Positions">
+                                <EditableTable data={intelligenceData.battle1_leadership.competitivePosition} columns={intelligenceData.battle1_leadership.competitivePosition.map((_, i) => `Competitor ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle1_leadership')} path="battle1_leadership.competitivePosition" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'rank', label: 'Rank'}, {key: 'company', label: 'Company'}, {key: 'share', label: 'Share %'}, {key: 'differentiators', label: 'Differentiators'}, {key: 'benchmarks', label: 'Benchmarks'}, {key: 'sourceLink', label: 'Source Link'} ]} />
                                 {isBattleEditable('battle1_leadership') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle1_leadership.competitivePosition', emptyCompetitivePosition)}><Plus className="w-4 h-4 mr-1"/>Add Competitor</Button>}
                             </SubSection>
                             <SubSection title="Geographic Footprint">
-                                <QuickTools companyName={intelligenceData.companyName} topic="geographic footprint offices"/>
-                                <EditableTable data={intelligenceData.battle1_leadership.geographicFootprint} columns={intelligenceData.battle1_leadership.geographicFootprint.map((_, i) => `Office ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle1_leadership')} path="battle1_leadership.geographicFootprint" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'location', label: 'Location'}, {key: 'openedYear', label: 'Opened Year'}, {key: 'facilityType', label: 'Facility Type'}, {key: 'sourceLink', label: 'Source Link'}, {key: 'notes', label: 'Notes'} ]}/>
-                                {isBattleEditable('battle1_leadership') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle1_leadership.geographicFootprint', emptyGeographicFootprint)}><Plus className="w-4 h-4 mr-1"/>Add Office</Button>}
+                                <EditableTable data={intelligenceData.battle1_leadership.geographicFootprint} columns={intelligenceData.battle1_leadership.geographicFootprint.map((_, i) => `Location ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle1_leadership')} path="battle1_leadership.geographicFootprint" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'location', label: 'Location'}, {key: 'openedYear', label: 'Opened Year'}, {key: 'facilityType', label: 'Facility Type'}, {key: 'sourceLink', label: 'Source Link'}, {key: 'notes', label: 'Notes'} ]} />
+                                {isBattleEditable('battle1_leadership') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle1_leadership.geographicFootprint', emptyGeographicFootprint)}><Plus className="w-4 h-4 mr-1"/>Add Location</Button>}
                             </SubSection>
                         </motion.div>
                     )}
-                    {activeTab === 'B2' && (
+                     {activeTab === 'B2' && (
                         <motion.div key="b2" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                           <SectionHeader progress={battleProgress['battle2_products'] || 0}>
-                               {BATTLE_CONFIGS.battle2_products.name}
-                           </SectionHeader>
-                           <SubSection title="Products / Services">
-                                <QuickTools companyName={intelligenceData.companyName} topic="product lines"/>
-                                <EditableTable data={intelligenceData.battle2_products.productLines} columns={intelligenceData.battle2_products.productLines.map((p, i) => p.productName || `Product ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle2_products')} path="battle2_products.productLines" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'productName', label: 'Product Name'}, {key: 'productType', label: 'Product Type'}, {key: 'launchDate', label: 'Launch Date'}, {key: 'category', label: 'Category'}, {key: 'targetSegment', label: 'Target Segment'}, {key: 'keyFeatures', label: 'Key Features'}, {key: 'pricingModel', label: 'Pricing Model'}, {key: 'price', label: 'Price'}, {key: 'reviewsScore', label: 'Reviews Score'}, {key: 'primaryCompetitors', label: 'Primary Competitors'}, {key: 'sourceLink', label: 'Source Link'}, {key: 'notes', label: 'Notes'} ]}/>
-                                {isBattleEditable('battle2_products') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle2_products.productLines', emptyProductLine)}><Plus className="w-4 h-4 mr-1"/>Add Product</Button>}
+                           <SectionHeader progress={battleProgress['battle2_products'] || 0}>{BATTLE_CONFIGS.battle2_products.name}</SectionHeader>
+                            <SubSection title="Product Lines">
+                                <EditableTable data={intelligenceData.battle2_products.productLines} columns={intelligenceData.battle2_products.productLines.map((_, i) => `Product ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle2_products')} path="battle2_products.productLines" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'productName', label: 'Product Name'}, {key: 'productType', label: 'Type'}, {key: 'launchDate', label: 'Launch Date'}, {key: 'category', label: 'Category'}, {key: 'targetSegment', label: 'Target Segment'}, {key: 'keyFeatures', label: 'Key Features'}, {key: 'pricingModel', label: 'Pricing Model'}, {key: 'price', label: 'Price'}, {key: 'reviewsScore', label: 'Reviews Score'}, {key: 'primaryCompetitors', label: 'Competitors'}, {key: 'sourceLink', label: 'Source'}, {key: 'notes', label: 'Notes'} ]} />
+                               {isBattleEditable('battle2_products') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle2_products.productLines', emptyProductLine)}><Plus className="w-4 h-4 mr-1"/>Add Product</Button>}
                            </SubSection>
                            <SubSection title="Pricing Changes">
-                                <QuickTools companyName={intelligenceData.companyName} topic="pricing changes history"/>
-                                <EditableTable data={intelligenceData.battle2_products.pricingChanges} columns={intelligenceData.battle2_products.pricingChanges.map((_, i) => `Change ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle2_products')} path="battle2_products.pricingChanges" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'date', label: 'Date'}, {key: 'oldPrice', label: 'Old Price'}, {key: 'newPrice', label: 'New Price'}, {key: 'reason', label: 'Reason'}, {key: 'sourceLink', label: 'Source Link'}, {key: 'notes', label: 'Notes'} ]}/>
-                                {isBattleEditable('battle2_products') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle2_products.pricingChanges', emptyPricingChange)}><Plus className="w-4 h-4 mr-1"/>Add Change</Button>}
+                                <EditableTable data={intelligenceData.battle2_products.pricingChanges} columns={intelligenceData.battle2_products.pricingChanges.map((_, i) => `Change ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle2_products')} path="battle2_products.pricingChanges" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'date', label: 'Date'}, {key: 'oldPrice', label: 'Old Price'}, {key: 'newPrice', label: 'New Price'}, {key: 'reason', label: 'Reason'}, {key: 'sourceLink', label: 'Source'}, {key: 'notes', label: 'Notes'} ]} />
+                               {isBattleEditable('battle2_products') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle2_products.pricingChanges', emptyPricingChange)}><Plus className="w-4 h-4 mr-1"/>Add Change</Button>}
                            </SubSection>
-                           <SubSection title="Social Presence">
-                                <QuickTools companyName={intelligenceData.companyName} topic="social media presence"/>
-                                <EditableTable data={intelligenceData.battle2_products.platforms} columns={intelligenceData.battle2_products.platforms.map((p, i) => p.platformName || `Platform ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle2_products')} path="battle2_products.platforms" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'platformName', label: 'Platform Name'}, {key: 'pageLink', label: 'Page Link'}, {key: 'followers', label: 'Followers'}, {key: 'engagementRate', label: 'Engagement Rate %'}, {key: 'runningAds', label: 'No. of Running Ads'}, {key: 'sourceLink', label: 'Source Link'}, {key: 'notes', label: 'Notes'} ]}/>
-                                {isBattleEditable('battle2_products') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle2_products.platforms', emptyPlatform)}><Plus className="w-4 h-4 mr-1"/>Add Platform</Button>}
+                           <SubSection title="Social Platforms">
+                                <EditableTable data={intelligenceData.battle2_products.platforms} columns={intelligenceData.battle2_products.platforms.map((_, i) => `Platform ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle2_products')} path="battle2_products.platforms" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'platformName', label: 'Platform'}, {key: 'pageLink', label: 'Link'}, {key: 'followers', label: 'Followers'}, {key: 'engagementRate', label: 'Engagement %'}, {key: 'runningAds', label: 'Running Ads?'}, {key: 'sourceLink', label: 'Source'}, {key: 'notes', label: 'Notes'} ]} />
+                               {isBattleEditable('battle2_products') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle2_products.platforms', emptyPlatform)}><Plus className="w-4 h-4 mr-1"/>Add Platform</Button>}
                            </SubSection>
-                           <SubSection title="Influencer Partnerships">
-                                <QuickTools companyName={intelligenceData.companyName} topic="influencer partnerships"/>
-                                <EditableTable data={intelligenceData.battle2_products.influencerPartnerships} columns={intelligenceData.battle2_products.influencerPartnerships.map((p, i) => p.influencerName || `Influencer ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle2_products')} path="battle2_products.influencerPartnerships" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'influencerName', label: 'Influencer Name'}, {key: 'totalFollowers', label: 'Total Followers'}, {key: 'platforms', label: 'Platforms'}, {key: 'campaign', label: 'Campaign'}, {key: 'sourceLink', label: 'Source Link'}, {key: 'notes', label: 'Notes'} ]}/>
-                                {isBattleEditable('battle2_products') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle2_products.influencerPartnerships', emptyInfluencerPartnership)}><Plus className="w-4 h-4 mr-1"/>Add Influencer</Button>}
+                            <SubSection title="Influencer Partnerships">
+                                <EditableTable data={intelligenceData.battle2_products.influencerPartnerships} columns={intelligenceData.battle2_products.influencerPartnerships.map((_, i) => `Influencer ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle2_products')} path="battle2_products.influencerPartnerships" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'influencerName', label: 'Name'}, {key: 'totalFollowers', label: 'Followers'}, {key: 'platforms', label: 'Platforms'}, {key: 'campaign', label: 'Campaign'}, {key: 'sourceLink', label: 'Source'}, {key: 'notes', label: 'Notes'} ]} />
+                               {isBattleEditable('battle2_products') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle2_products.influencerPartnerships', emptyInfluencerPartnership)}><Plus className="w-4 h-4 mr-1"/>Add Influencer</Button>}
                            </SubSection>
                         </motion.div>
                     )}
                     {activeTab === 'B3' && (
                         <motion.div key="b3" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                           <SectionHeader progress={battleProgress['battle3_funding'] || 0}>
-                               {BATTLE_CONFIGS.battle3_funding.name}
-                           </SectionHeader>
-                            <SubSection title="Funding & Revenue">
-                                <QuickTools companyName={intelligenceData.companyName} topic="investment funding"/>
-                                <EditableForm data={intelligenceData.battle3_funding.getInvestment} onInputChange={handleInputChange} isEditable={isBattleEditable('battle3_funding')} path="battle3_funding.getInvestment" aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} fields={[ {key: 'yesNo', label: 'Get Investment (Yes/No)'}, {key: 'amount', label: 'Total Amount (USD)'}, {key: 'rounds', label: 'No. of Rounds'}, {key: 'sourceLink', label: 'Source Link'} ]}/>
+                            <SectionHeader progress={battleProgress['battle3_funding'] || 0}>{BATTLE_CONFIGS.battle3_funding.name}</SectionHeader>
+                            <SubSection title="Investment Summary">
+                                <EditableForm data={intelligenceData.battle3_funding.getInvestment} onInputChange={handleInputChange} isEditable={isBattleEditable('battle3_funding')} path="battle3_funding.getInvestment" aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} fields={[ {key: 'amount', label: 'Total Amount'}, {key: 'yesNo', label: 'Seeking Funding?'}, {key: 'rounds', label: 'Total Rounds'}, {key: 'sourceLink', label: 'Source Link'} ]} />
                             </SubSection>
                             <SubSection title="Funding Rounds">
-                                <QuickTools companyName={intelligenceData.companyName} topic="funding rounds"/>
-                                <EditableTable data={intelligenceData.battle3_funding.fundingRounds} columns={intelligenceData.battle3_funding.fundingRounds.map((r, i) => r.series || `Round ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle3_funding')} path="battle3_funding.fundingRounds" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'date', label: 'Date'}, {key: 'series', label: 'Series'}, {key: 'amount', label: 'Amount (USD)'}, {key: 'numberOfInvestors', label: 'No. of Investors'}, {key: 'investors', label: 'Investors'}, {key: 'leadInvestor', label: 'Lead Investor'}, {key: 'notes', label: 'Notes'} ]}/>
+                                <EditableTable data={intelligenceData.battle3_funding.fundingRounds} columns={intelligenceData.battle3_funding.fundingRounds.map((_, i) => `Round ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle3_funding')} path="battle3_funding.fundingRounds" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'date', label: 'Date'}, {key: 'series', label: 'Series'}, {key: 'amount', label: 'Amount'}, {key: 'numberOfInvestors', label: '# Investors'}, {key: 'investors', label: 'Investors'}, {key: 'leadInvestor', label: 'Lead Investor'}, {key: 'notes', label: 'Notes'} ]} />
                                 {isBattleEditable('battle3_funding') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle3_funding.fundingRounds', emptyFundingRound)}><Plus className="w-4 h-4 mr-1"/>Add Round</Button>}
                             </SubSection>
-                            <SubSection title="Investors 📌">
-                                <QuickTools companyName={intelligenceData.companyName} topic="investors"/>
-                                <EditableTable data={intelligenceData.battle3_funding.investors} columns={intelligenceData.battle3_funding.investors.map((inv, i) => inv.name || `Investor ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle3_funding')} path="battle3_funding.investors" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'name', label: 'Name'}, {key: 'type', label: 'Type (VC/PE/Angel)'}, {key: 'stake', label: 'Stake %'}, {key: 'sourceLink', label: 'Source Link'}, {key: 'notes', label: 'Notes'} ]}/>
-                                {isBattleEditable('battle3_funding') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle3_funding.investors', emptyInvestor)}><Plus className="w-4 h-4 mr-1"/>Add Investor</Button>}
+                            <SubSection title="Key Investors">
+                                 <EditableTable data={intelligenceData.battle3_funding.investors} columns={intelligenceData.battle3_funding.investors.map((_, i) => `Investor ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle3_funding')} path="battle3_funding.investors" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'name', label: 'Name'}, {key: 'type', label: 'Type'}, {key: 'stake', label: 'Stake %'}, {key: 'sourceLink', label: 'Source'}, {key: 'notes', label: 'Notes'} ]} />
+                                 {isBattleEditable('battle3_funding') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle3_funding.investors', emptyInvestor)}><Plus className="w-4 h-4 mr-1"/>Add Investor</Button>}
                             </SubSection>
                              <SubSection title="Revenue & Valuation">
-                                <QuickTools companyName={intelligenceData.companyName} topic="revenue and valuation"/>
-                                <EditableForm data={intelligenceData.battle3_funding.revenueValuation} onInputChange={handleInputChange} isEditable={isBattleEditable('battle3_funding')} path="battle3_funding.revenueValuation" aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} fields={[ {key: 'revenue', label: 'Revenue (USD)'}, {key: 'growthRate', label: 'Growth rate'}, {key: 'latestValuation', label: 'Latest Valuation (USD)'}, {key: 'notes', label: 'Notes', fullWidth: true}, {key: 'sourceLink', label: 'Source Link', fullWidth: true} ]}/>
+                                <EditableForm data={intelligenceData.battle3_funding.revenueValuation} onInputChange={handleInputChange} isEditable={isBattleEditable('battle3_funding')} path="battle3_funding.revenueValuation" aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} fields={[ {key: 'revenue', label: 'Revenue'}, {key: 'growthRate', label: 'Growth Rate'}, {key: 'latestValuation', label: 'Latest Valuation'}, {key: 'sourceLink', label: 'Source'}, {key: 'notes', label: 'Notes', fullWidth: true} ]} />
                             </SubSection>
                         </motion.div>
                     )}
                     {activeTab === 'B4' && (
                         <motion.div key="b4" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                           <SectionHeader progress={battleProgress['battle4_customers'] || 0}>
-                               {BATTLE_CONFIGS.battle4_customers.name}
-                           </SectionHeader>
-                            <SubSection title="Customer Segments">
-                                <QuickTools companyName={intelligenceData.companyName} topic="B2C customer segments"/>
-                                <EditableTable data={intelligenceData.battle4_customers.b2cSegments} columns={intelligenceData.battle4_customers.b2cSegments.map((_, i) => `Persona ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle4_customers')} path="battle4_customers.b2cSegments" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'age', label: 'Age'}, {key: 'income', label: 'Income'}, {key: 'educationalLevel', label: 'Educational Level'}, {key: 'interestsLifestyle', label: 'Interests & Lifestyle'}, {key: 'behavior', label: 'Behavior'}, {key: 'needsPainPoints', label: 'Needs/Pain Points'}, {key: 'location', label: 'Location'}, {key: 'revenueShare', label: 'Revenue Share (%)'}, {key: 'sourceLink', label: 'Source Link'}, {key: 'notes', label: 'Notes'} ]}/>
-                                {isBattleEditable('battle4_customers') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle4_customers.b2cSegments', emptyB2CSegment)}><Plus className="w-4 h-4 mr-1"/>Add Persona</Button>}
+                           <SectionHeader progress={battleProgress['battle4_customers'] || 0}>{BATTLE_CONFIGS.battle4_customers.name}</SectionHeader>
+                            <SubSection title="B2C Segments">
+                                 <EditableTable data={intelligenceData.battle4_customers.b2cSegments} columns={intelligenceData.battle4_customers.b2cSegments.map((_, i) => `Segment ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle4_customers')} path="battle4_customers.b2cSegments" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'age', label: 'Age'}, {key: 'income', label: 'Income'}, {key: 'educationalLevel', label: 'Education'}, {key: 'interestsLifestyle', label: 'Lifestyle'}, {key: 'behavior', label: 'Behavior'}, {key: 'needsPainPoints', label: 'Pain Points'}, {key: 'location', label: 'Location'}, {key: 'revenueShare', label: 'Revenue %'}, {key: 'sourceLink', label: 'Source'}, {key: 'notes', label: 'Notes'} ]} />
+                                 {isBattleEditable('battle4_customers') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle4_customers.b2cSegments', emptyB2CSegment)}><Plus className="w-4 h-4 mr-1"/>Add Segment</Button>}
                             </SubSection>
                             <SubSection title="B2B Segments">
-                                <QuickTools companyName={intelligenceData.companyName} topic="B2B customer segments"/>
-                                <EditableTable data={intelligenceData.battle4_customers.b2bSegments} columns={intelligenceData.battle4_customers.b2bSegments.map((_, i) => `Segment ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle4_customers')} path="battle4_customers.b2bSegments" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'businessSize', label: 'Business Size'}, {key: 'industry', label: 'Industry'}, {key: 'revenueTargeted', label: 'Revenue of Targeted Co.'}, {key: 'technographic', label: 'Technographic'}, {key: 'behavior', label: 'Behavior'}, {key: 'needsPainPoints', label: 'Needs/Pain Points'}, {key: 'revenueShare', label: 'Revenue Share (%)'}, {key: 'sourceLink', label: 'Source Link'}, {key: 'notes', label: 'Notes'} ]}/>
-                                {isBattleEditable('battle4_customers') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle4_customers.b2bSegments', emptyB2BSegment)}><Plus className="w-4 h-4 mr-1"/>Add Segment</Button>}
+                                 <EditableTable data={intelligenceData.battle4_customers.b2bSegments} columns={intelligenceData.battle4_customers.b2bSegments.map((_, i) => `Segment ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle4_customers')} path="battle4_customers.b2bSegments" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'businessSize', label: 'Size'}, {key: 'industry', label: 'Industry'}, {key: 'revenueTargeted', label: 'Revenue'}, {key: 'technographic', label: 'Tech'}, {key: 'behavior', label: 'Behavior'}, {key: 'needsPainPoints', label: 'Pain Points'}, {key: 'revenueShare', label: 'Revenue %'}, {key: 'sourceLink', label: 'Source'}, {key: 'notes', label: 'Notes'} ]} />
+                                 {isBattleEditable('battle4_customers') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle4_customers.b2bSegments', emptyB2BSegment)}><Plus className="w-4 h-4 mr-1"/>Add Segment</Button>}
                             </SubSection>
-                            <SubSection title="Reviews (overview)">
-                                <QuickTools companyName={intelligenceData.companyName} topic="customer reviews"/>
-                                <EditableForm data={intelligenceData.battle4_customers.reviews} onInputChange={handleInputChange} isEditable={isBattleEditable('battle4_customers')} path="battle4_customers.reviews" aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} fields={[ {key: 'avgRating', label: 'Avg Rating'}, {key: 'positive', label: 'Positive %'}, {key: 'negative', label: 'Negative %'}, {key: 'sourceLink', label: 'Source Link'}, {key: 'commonThemes', label: 'Common Themes', fullWidth: true} ]}/>
+                            <SubSection title="Reviews Analysis">
+                                <EditableForm data={intelligenceData.battle4_customers.reviews} onInputChange={handleInputChange} isEditable={isBattleEditable('battle4_customers')} path="battle4_customers.reviews" aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} fields={[ {key: 'avgRating', label: 'Avg Rating'}, {key: 'positive', label: 'Positive Themes'}, {key: 'negative', label: 'Negative Themes'}, {key: 'commonThemes', label: 'Common Themes'}, {key: 'sourceLink', label: 'Source Link'} ]} />
                             </SubSection>
-                            <SubSection title="Pain Points">
-                                <QuickTools companyName={intelligenceData.companyName} topic="customer pain points"/>
-                                <EditableTable data={intelligenceData.battle4_customers.painPoints} columns={intelligenceData.battle4_customers.painPoints.map((_, i) => `Pain Point ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle4_customers')} path="battle4_customers.painPoints" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'description', label: 'Description'}, {key: 'impact', label: 'Impact'}, {key: 'frequency', label: 'Frequency'}, {key: 'suggestedFix', label: 'Suggested Fix'}, {key: 'sourceLink', label: 'Source Link'}, {key: 'notes', label: 'Notes'} ]}/>
+                            <SubSection title="Customer Pain Points">
+                                <EditableTable data={intelligenceData.battle4_customers.painPoints} columns={intelligenceData.battle4_customers.painPoints.map((_, i) => `Pain Point ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle4_customers')} path="battle4_customers.painPoints" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'description', label: 'Description'}, {key: 'impact', label: 'Impact'}, {key: 'frequency', label: 'Frequency'}, {key: 'suggestedFix', label: 'Suggested Fix'}, {key: 'sourceLink', label: 'Source'}, {key: 'notes', label: 'Notes'} ]} />
                                 {isBattleEditable('battle4_customers') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle4_customers.painPoints', emptyPainPoint)}><Plus className="w-4 h-4 mr-1"/>Add Pain Point</Button>}
                             </SubSection>
                         </motion.div>
                     )}
                     {activeTab === 'B5' && (
                         <motion.div key="b5" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                           <SectionHeader progress={battleProgress['battle5_alliances'] || 0}>
-                               {BATTLE_CONFIGS.battle5_alliances.name}
-                           </SectionHeader>
-                            <SubSection title="Partnerships / Supply Chain / Growth Trajectory">
-                                <QuickTools companyName={intelligenceData.companyName} topic="strategic partners"/>
-                                <EditableTable data={intelligenceData.battle5_alliances.strategicPartners} columns={intelligenceData.battle5_alliances.strategicPartners.map((p, i) => p.name || `Partner ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle5_alliances')} path="battle5_alliances.strategicPartners" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'name', label: 'Name'}, {key: 'type', label: 'Type'}, {key: 'region', label: 'Region'}, {key: 'startDate', label: 'Start Date'}, {key: 'sourceLink', label: 'Source Link'}, {key: 'notes', label: 'Notes'} ]}/>
+                            <SectionHeader progress={battleProgress['battle5_alliances'] || 0}>{BATTLE_CONFIGS.battle5_alliances.name}</SectionHeader>
+                            <SubSection title="Strategic Partners">
+                                <EditableTable data={intelligenceData.battle5_alliances.strategicPartners} columns={intelligenceData.battle5_alliances.strategicPartners.map((_, i) => `Partner ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle5_alliances')} path="battle5_alliances.strategicPartners" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'name', label: 'Name'}, {key: 'type', label: 'Type'}, {key: 'region', label: 'Region'}, {key: 'startDate', label: 'Start Date'}, {key: 'sourceLink', label: 'Source'}, {key: 'notes', label: 'Notes'} ]} />
                                 {isBattleEditable('battle5_alliances') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle5_alliances.strategicPartners', emptyStrategicPartner)}><Plus className="w-4 h-4 mr-1"/>Add Partner</Button>}
                             </SubSection>
                             <SubSection title="Key Suppliers">
-                                <QuickTools companyName={intelligenceData.companyName} topic="key suppliers"/>
-                                <EditableTable data={intelligenceData.battle5_alliances.keySuppliers} columns={intelligenceData.battle5_alliances.keySuppliers.map((s, i) => s.name || `Supplier ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle5_alliances')} path="battle5_alliances.keySuppliers" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'name', label: 'Name'}, {key: 'commodity', label: 'Commodity'}, {key: 'region', label: 'Region'}, {key: 'contractValue', label: 'Contract Value'}, {key: 'sourceLink', label: 'Source Link'}, {key: 'notes', label: 'Notes'} ]}/>
+                                <EditableTable data={intelligenceData.battle5_alliances.keySuppliers} columns={intelligenceData.battle5_alliances.keySuppliers.map((_, i) => `Supplier ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle5_alliances')} path="battle5_alliances.keySuppliers" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'name', label: 'Name'}, {key: 'commodity', label: 'Commodity'}, {key: 'region', label: 'Region'}, {key: 'contractValue', label: 'Contract Value'}, {key: 'sourceLink', label: 'Source'}, {key: 'notes', label: 'Notes'} ]} />
                                 {isBattleEditable('battle5_alliances') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle5_alliances.keySuppliers', emptyKeySupplier)}><Plus className="w-4 h-4 mr-1"/>Add Supplier</Button>}
                             </SubSection>
-                            <SubSection title="Growth Rates (for the Past Year)">
-                                <QuickTools companyName={intelligenceData.companyName} topic="growth rates"/>
-                                <EditableForm data={intelligenceData.battle5_alliances.growthRates} onInputChange={handleInputChange} isEditable={isBattleEditable('battle5_alliances')} path="battle5_alliances.growthRates" aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} fields={[ {key: 'period', label: 'Period'}, {key: 'revenueGrowth', label: 'Revenue Growth %'}, {key: 'userGrowth', label: 'User Growth %'}, {key: 'sourceLink', label: 'Source Link', fullWidth: true} ]}/>
+                             <SubSection title="Growth Rates">
+                                <EditableForm data={intelligenceData.battle5_alliances.growthRates} onInputChange={handleInputChange} isEditable={isBattleEditable('battle5_alliances')} path="battle5_alliances.growthRates" aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} fields={[ {key: 'period', label: 'Period'}, {key: 'revenueGrowth', label: 'Revenue Growth %'}, {key: 'userGrowth', label: 'User Growth %'}, {key: 'sourceLink', label: 'Source'} ]} />
                             </SubSection>
-                            <SubSection title="Expansions (Projections)">
-                                <QuickTools companyName={intelligenceData.companyName} topic="expansion plans"/>
-                                <EditableTable data={intelligenceData.battle5_alliances.expansions} columns={intelligenceData.battle5_alliances.expansions.map((_, i) => `Expansion ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle5_alliances')} path="battle5_alliances.expansions" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'type', label: 'Type (Geo/Product)'}, {key: 'regionMarket', label: 'Region/Market'}, {key: 'date', label: 'Date'}, {key: 'investment', label: 'Investment'}, {key: 'sourceLink', label: 'Source Link'}, {key: 'notes', label: 'Notes'} ]}/>
-                                {isBattleEditable('battle5_alliances') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle5_alliances.expansions', emptyExpansion)}><Plus className="w-4 h-4 mr-1"/>Add Expansion</Button>}
+                            <SubSection title="Expansions">
+                                 <EditableTable data={intelligenceData.battle5_alliances.expansions} columns={intelligenceData.battle5_alliances.expansions.map((_, i) => `Expansion ${i+1}`)} onInputChange={handleInputChange} isEditable={isBattleEditable('battle5_alliances')} path="battle5_alliances.expansions" onRemoveRow={removeRow} aiLoadingFields={aiLoadingFields} onAiAssist={onAiAssist} rows={[ {key: 'type', label: 'Type'}, {key: 'regionMarket', label: 'Region/Market'}, {key: 'date', label: 'Date'}, {key: 'investment', label: 'Investment'}, {key: 'sourceLink', label: 'Source'}, {key: 'notes', label: 'Notes'} ]} />
+                                 {isBattleEditable('battle5_alliances') && <Button size="sm" variant="outline" className="mt-2" onClick={() => addRow('battle5_alliances.expansions', emptyExpansion)}><Plus className="w-4 h-4 mr-1"/>Add Expansion</Button>}
                             </SubSection>
                         </motion.div>
                     )}
@@ -809,7 +730,7 @@ const WarRoomScreen: React.FC = () => {
                             <div ref={chatContainerRef} className="flex-grow p-3 space-y-3 overflow-y-auto">
                                 {chatMessages.map(msg => (
                                     <div key={msg.id} className={`flex items-start gap-2 ${msg.userId === currentUser.id ? 'flex-row-reverse' : ''}`}>
-                                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.userId}`} alt="avatar" className="w-6 h-6 rounded-full"/>
+                                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.userDisplayName}`} alt="avatar" className="w-6 h-6 rounded-full"/>
                                         <div className={`px-3 py-2 rounded-lg max-w-xs text-sm ${msg.userId === currentUser.id ? 'bg-accent text-background' : 'bg-secondary'}`}>
                                             <div className="font-bold text-xs mb-0.5">{msg.userDisplayName}</div>
                                             <p className="whitespace-pre-wrap break-words">{msg.message}</p>

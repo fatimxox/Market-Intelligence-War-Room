@@ -1,3 +1,29 @@
+// FIX: Moved AIScoreResult and BattleWinner interfaces here to resolve a circular dependency.
+export interface BattleWinner {
+    battle: string;
+    winner: 'alpha' | 'beta' | 'tie';
+    reasoning: string;
+}
+
+export interface AIScoreResult {
+  team_alpha_score: {
+    accuracy_score: number;
+    sources_score: number;
+    presentation_score: number;
+    speed_score: number;
+    reasoning: string;
+  };
+  team_beta_score: {
+    accuracy_score: number;
+    sources_score: number;
+    presentation_score: number;
+    speed_score: number;
+    reasoning: string;
+  };
+  winning_team_reasoning: string;
+  battle_winners: BattleWinner[];
+}
+
 export enum UserRole {
   ADMIN = 'Admin',
   TEAM_LEADER = 'Team Leader',
@@ -31,6 +57,7 @@ export type PlayerAssignment = {
   email: string;
   display_name: string;
   battle_role: BattleRole | null;
+  ai_assist_used?: boolean;
 };
 
 export type Team = {
@@ -42,31 +69,6 @@ export type Team = {
   report_submitted?: boolean;
   submission_timestamp?: string;
 };
-
-export interface BattleWinner {
-    battle: string; // e.g., 'battle1_leadership'
-    winner: 'alpha' | 'beta' | 'tie';
-    reasoning: string;
-}
-
-export interface AIScoreResult {
-  team_alpha_score: {
-    accuracy_score: number;
-    sources_score: number;
-    presentation_score: number;
-    speed_score: number;
-    reasoning: string;
-  };
-  team_beta_score: {
-    accuracy_score: number;
-    sources_score: number;
-    presentation_score: number;
-    speed_score: number;
-    reasoning: string;
-  };
-  winning_team_reasoning: string;
-  battle_winners: BattleWinner[];
-}
 
 export type Mission = {
   id:string;

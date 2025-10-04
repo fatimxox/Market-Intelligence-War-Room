@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { User, BattleRole, PlayerAssignment, Team, Mission } from '../../types';
-import Card from '../ui/Card';
-import Button from '../ui/Button';
-import { ROLE_BATTLE_MAP, BATTLE_CONFIGS } from '../../constants';
-import { ChevronRight } from '../icons';
-import { db } from '../../lib/db';
+import { User, BattleRole, PlayerAssignment, Team, Mission } from '../../types.ts';
+import Card from '../ui/Card.tsx';
+import Button from '../ui/Button.tsx';
+import { ROLE_BATTLE_MAP, BATTLE_CONFIGS } from '../../constants.ts';
+import { ChevronRight } from '../icons.tsx';
+import { db } from '../../lib/db.ts';
 
 interface PlayerCardProps {
     member: PlayerAssignment;
@@ -132,9 +132,9 @@ const StrategyRoomScreen: React.FC = () => {
         return (
              <div
                 className={`bg-secondary p-6 rounded-xl transition-all duration-200 h-full flex flex-col ${dropTarget === role.id && isLeader ? 'bg-accent/20 ring-2 ring-accent' : ''}`}
-                onDragOver={(e) => { e.preventDefault(); if (isLeader) setDropTarget(role.id); }}
+                onDragOver={(e) => { e.preventDefault(); if (isLeader) setDropTarget(role.id as BattleRole); }}
                 onDragLeave={() => setDropTarget(null)}
-                onDrop={() => handleDrop(role.id)}
+                onDrop={() => handleDrop(role.id as BattleRole)}
             >
                  <div className="text-center">
                     <div className={`w-16 h-16 mx-auto mb-4 rounded-lg flex items-center justify-center`}>
@@ -155,13 +155,13 @@ const StrategyRoomScreen: React.FC = () => {
     }
 
     const battleRoles = Object.entries(ROLE_BATTLE_MAP).map(([id, battleKey]) => ({
-        id,
+        id: id as BattleRole,
         name: BATTLE_CONFIGS[battleKey].name.split(':')[1].trim().split('&')[0].trim(),
         description: BATTLE_CONFIGS[battleKey].name.split(':')[0],
         icon: BATTLE_CONFIGS[battleKey].icon,
     }));
     
-    const allRolesAssigned = team.members.length === Object.keys(roleAssignments).length;
+    const allRolesAssigned = team.members.length > 0 && team.members.length === Object.keys(roleAssignments).length;
 
     return (
         <div className="p-6">

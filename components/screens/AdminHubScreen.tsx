@@ -118,7 +118,8 @@ const MissionHubScreen: React.FC = () => {
                                     <p className="font-medium">
                                         {m.display_name}
                                     </p>
-                                    {alphaTeam.team_leader_email === m.email && <Crown className="w-5 h-5 text-accent ml-auto" title="Team Leader" />}
+                                    {/* FIX: Removed invalid 'title' prop from Crown component. */}
+                                    {alphaTeam.team_leader_email === m.email && <Crown className="w-5 h-5 text-accent ml-auto" />}
                                 </div>
                             ))}
                         </div>
@@ -141,7 +142,8 @@ const MissionHubScreen: React.FC = () => {
                                     <p className="font-medium">
                                         {m.display_name}
                                     </p>
-                                    {betaTeam.team_leader_email === m.email && <Crown className="w-5 h-5 text-accent ml-auto" title="Team Leader" />}
+                                    {/* FIX: Removed invalid 'title' prop from Crown component. */}
+                                    {betaTeam.team_leader_email === m.email && <Crown className="w-5 h-5 text-accent ml-auto" />}
                                 </div>
                             ))}
                         </div>

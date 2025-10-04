@@ -4,12 +4,84 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Market Intelligence War Room</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              background: '#0A0C10',
+              panel: '#11151C',
+              'panel-border': '#2A303C',
+              'primary-text': '#EAEAEA',
+              accent: '#FDE047',
+              'accent-hover': '#FACC15',
+              secondary: '#1A222C',
+              'secondary-hover': '#242F3D',
+              disabled: 'rgba(234, 234, 234, 0.5)',
+              'team-alpha': '#38BDF8', // light-blue-400
+              'team-beta': '#F87171', // red-400
+              success: '#4ADE80', // green-400
+              danger: '#F87171', // red-400
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              mono: ['"Fira Code"', 'monospace', 'ui-monospace']
+            },
+            keyframes: {
+              glow: {
+                '0%, 100%': { opacity: 0.7, transform: 'scale(1)' },
+                '50%': { opacity: 1, transform: 'scale(1.02)' },
+              },
+              'glow-border': {
+                '0%, 100%': { borderColor: 'rgba(253, 224, 71, 0.2)', boxShadow: '0 0 10px rgba(253, 224, 71, 0.1)' },
+                '50%': { borderColor: 'rgba(253, 224, 71, 0.6)', boxShadow: '0 0 25px rgba(253, 224, 71, 0.3)' },
+              },
+              subtlePulse: {
+                '0%, 100%': { transform: 'scale(1)', boxShadow: '0 0 0 0 rgba(253, 224, 71, 0.4)' },
+                '50%': { transform: 'scale(1.02)', boxShadow: '0 0 10px 5px rgba(253, 224, 71, 0)' }
+              }
+            },
+            animation: {
+              glow: 'glow 3s ease-in-out infinite',
+              'glow-border': 'glow-border 3s ease-in-out infinite',
+              'subtle-pulse': 'subtlePulse 2.5s ease-in-out infinite'
+            },
+          }
+        }
+      }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@500&family=Inter:wght@400;500;600;700;900&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+      body {
+        background-color: #0A0C10;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 35px 35px;
+      }
+    </style>
+    <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.21.0",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.2",
+    "recharts": "https://aistudiocdn.com/recharts@^3.2.1",
+    "framer-motion": "https://aistudiocdn.com/framer-motion@^12.23.22",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.0.4",
+    "vite": "https://aistudiocdn.com/vite@^7.1.7"
+  }
+}
+</script>
 </head>
 <body class="bg-background text-primary-text">
     <div id="root"></div>
-    <script type="module" src="/src/index.tsx"></script>
+    <script type="text/babel" data-type="module" src="./index.tsx"></script>
 </body>
 </html>
