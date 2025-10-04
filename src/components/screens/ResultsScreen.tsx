@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, animate } from 'framer-motion';
 import Card from '../ui/Card.tsx';
 import Button from '../ui/Button.tsx';
-import { Mission, Team, MissionStatus, User, AIScoreResult, BattleWinner, Report } from '../../types.ts';
+import { Mission, MissionStatus, User, AIScoreResult, BattleWinner, Report } from '../../types.ts';
 import { db } from '../../lib/db.ts';
 import { scoreReports } from '../../services/geminiService.ts';
 import { Award, BarChart3, Zap, Loader, FileText, Code } from '../icons.tsx';
@@ -83,8 +83,8 @@ const ResultsScreen: React.FC = () => {
     
     const [alphaScore, setAlphaScore] = useState<AIScoreResult['team_alpha_score'] | null>(null);
     const [betaScore, setBetaScore] = useState<AIScoreResult['team_beta_score'] | null>(null);
-    const [alphaStatus, setAlphaStatus] = useState<TeamStatus>('pending');
-    const [betaStatus, setBetaStatus] = useState<TeamStatus>('pending');
+    const [_alphaStatus, setAlphaStatus] = useState<TeamStatus>('pending');
+    const [_betaStatus, setBetaStatus] = useState<TeamStatus>('pending');
     const [reports, setReports] = useState<{ alpha: Report | null, beta: Report | null }>({ alpha: null, beta: null });
 
     const [aiReasoning, setAiReasoning] = useState('');
@@ -120,15 +120,16 @@ const ResultsScreen: React.FC = () => {
 
     const processResults = useCallback(async () => {
         if (!missionId) { setError("Mission ID not found."); setLoading(false); return; }
-        const missionData = db.getMissions().find(m => m.id === missionId);
+        const allMissions = await db.getMissions();
+        const missionData = allMissions.find(m => m.id === missionId);
         if (!missionData) { setError("Mission not found."); setLoading(false); return; }
         setMission(missionData);
 
-        const allTeams = db.getTeams();
+        const allTeams = await db.getTeams();
         const teamAlpha = allTeams.find(t => t.mission_id === missionId && t.team_name === 'alpha');
         const teamBeta = allTeams.find(t => t.mission_id === missionId && t.team_name === 'beta');
 
-        const allReports = db.getReports();
+        const allReports = await db.getReports();
         const reportAlpha = allReports.find(r => r.mission_id === missionId && r.team_name === 'alpha');
         const reportBeta = allReports.find(r => r.mission_id === missionId && r.team_name === 'beta');
         setReports({ alpha: reportAlpha || null, beta: reportBeta || null });
@@ -176,19 +177,20 @@ const ResultsScreen: React.FC = () => {
                 if (alphaTotal > betaTotal) finalWinner = 'alpha';
                 if (betaTotal > alphaTotal) finalWinner = 'beta';
 
-                db.updateMissions(db.getMissions().map(m => m.id === missionId ? { ...m, status: MissionStatus.COMPLETED, winner_team: finalWinner, team_alpha_score: alphaTotal, team_beta_score: betaTotal, score_details: finalScores } : m));
-                
-                const winningTeamEmails = finalWinner !== 'tie' ? (finalWinner === 'alpha' ? teamAlpha.members : teamBeta.members).map(m => m.email) : [];
-                const allParticipantEmails = new Set([...teamAlpha.members.map(m => m.email), ...teamBeta.members.map(m => m.email)]);
+                const updatedMissions = (await db.getMissions()).map(m => m.id === missionId ? { ...m, status: MissionStatus.COMPLETED, winner_team: finalWinner, team_alpha_score: alphaTotal, team_beta_score: betaTotal, score_details: finalScores } : m);
+                await db.updateMissions(updatedMissions);
 
-                const usersInDb = db.getUsers();
-                usersInDb.forEach(user => {
+                const winningTeamEmails = finalWinner !== 'tie' ? (finalWinner === 'alpha' ? teamAlpha.members : teamBeta.members).map((m: any) => m.email) : [];
+                const allParticipantEmails = new Set([...teamAlpha.members.map((m: any) => m.email), ...teamBeta.members.map((m: any) => m.email)]);
+
+                const usersInDb = await db.getUsers();
+                for (const user of usersInDb) {
                     if (allParticipantEmails.has(user.email)) {
                         const updatedUser = { ...user, total_missions: (user.total_missions || 0) + 1, missions_won: (user.missions_won || 0) + (winningTeamEmails.includes(user.email) ? 1 : 0) };
-                        db.updateUser(updatedUser);
+                        await db.updateUser(updatedUser);
                         if (currentUser && currentUser.id === updatedUser.id) localStorage.setItem('war-room-user', JSON.stringify(updatedUser));
                     }
-                });
+                }
             }
             setLoading(false);
         }

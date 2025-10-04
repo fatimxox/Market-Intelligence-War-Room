@@ -13,25 +13,26 @@ const LoginScreen: React.FC = () => {
     const [error, setError] = useState('');
     const navigate = useNavigate();
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!email || !password) {
             setError('Please enter both email and password.');
             return;
         }
 
-        const user = db.getUsers().find(u => u.email.toLowerCase() === email.toLowerCase());
+        const users = await db.getUsers();
+        const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
 
         if (!user) {
             setError('User not found. Please register.');
             return;
         }
-        
+
         if (user.password !== password) {
             setError('Invalid password.');
             return;
         }
-        
+
         localStorage.setItem('war-room-user', JSON.stringify(user));
 
         navigate('/dashboard');

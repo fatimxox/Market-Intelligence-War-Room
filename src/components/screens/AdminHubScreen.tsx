@@ -24,14 +24,19 @@ const MissionHubScreen: React.FC = () => {
     const [newMissionStartTime, setNewMissionStartTime] = useState<Date | null>(new Date(Date.now() + 24 * 60 * 60 * 1000));
 
     useEffect(() => {
-        const storedUser = localStorage.getItem('war-room-user');
-        if (storedUser) setUser(JSON.parse(storedUser));
-        
-        setMissions(db.getMissions());
-        setTeams(db.getTeams());
+        const loadData = async () => {
+            const storedUser = localStorage.getItem('war-room-user');
+            if (storedUser) setUser(JSON.parse(storedUser));
+
+            const allMissions = await db.getMissions();
+            const allTeams = await db.getTeams();
+            setMissions(allMissions);
+            setTeams(allTeams);
+        };
+        loadData();
     }, []);
 
-    const handleCreateMission = (e: React.FormEvent<HTMLFormElement>) => {
+    const handleCreateMission = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const mission: Mission = {
             id: `mission-${Date.now()}`,
@@ -44,16 +49,17 @@ const MissionHubScreen: React.FC = () => {
             created_by_admin: user?.email || 'admin',
             mission_start_time: newMissionStartTime ? newMissionStartTime.toISOString() : undefined,
         };
-        db.addMission(mission);
-        setMissions(db.getMissions());
+        await db.addMission(mission);
+        const updatedMissions = await db.getMissions();
+        setMissions(updatedMissions);
         setCreateModalOpen(false);
         setNewMission({ title: '', target_company: '', time_limit_minutes: 60 });
         setNewMissionStartTime(new Date(Date.now() + 24 * 60 * 60 * 1000));
     };
 
-    const updateMissionStatus = (missionId: string, status: MissionStatus) => {
+    const updateMissionStatus = async (missionId: string, status: MissionStatus) => {
         const updatedMissions = missions.map(m => m.id === missionId ? { ...m, status, mission_start_time: status === MissionStatus.ACTIVE ? new Date().toISOString() : m.mission_start_time } : m);
-        db.updateMissions(updatedMissions);
+        await db.updateMissions(updatedMissions);
         setMissions(updatedMissions);
         if (selectedMission?.id === missionId) {
             setSelectedMission(prev => prev ? { ...prev, status } : null);

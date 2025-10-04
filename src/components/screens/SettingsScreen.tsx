@@ -32,11 +32,11 @@ const SettingsScreen: React.FC = () => {
         }
     };
     
-    const handleSaveChanges = () => {
+    const handleSaveChanges = async () => {
         if (user) {
             const updatedUser = { ...user, displayName, avatarUrl: avatarUrl || user.avatarUrl };
-            db.updateUser(updatedUser);
-            localStorage.setItem('war-room-user', JSON.stringify(updatedUser)); // also update session
+            await db.updateUser(updatedUser);
+            localStorage.setItem('war-room-user', JSON.stringify(updatedUser));
             alert('Changes saved! Profile will update on next login.');
         }
     };

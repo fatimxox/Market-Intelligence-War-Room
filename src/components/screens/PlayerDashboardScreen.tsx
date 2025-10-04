@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Card from '../ui/Card.tsx';
 import Button from '../ui/Button.tsx';
 import { Mission, MissionStatus, User, UserRole } from '../../types.ts';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Target, Users, Clock, Trophy, Zap, AlertCircle, Play, Eye, Crown, Shield, BarChart3, Calendar, ChevronRight, TrendingUp } from '../icons.tsx';
 import { db } from '../../lib/db.ts';
 import { motion } from 'framer-motion';
@@ -14,23 +14,26 @@ const DashboardScreen: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('war-room-user');
-    if (storedUser) {
-      const parsedUser: User = JSON.parse(storedUser);
-      setUser(parsedUser);
-      
-      const allMissions = db.getMissions();
-      const allDbUsers = db.getUsers();
+    const loadData = async () => {
+      const storedUser = localStorage.getItem('war-room-user');
+      if (storedUser) {
+        const parsedUser: User = JSON.parse(storedUser);
+        setUser(parsedUser);
 
-      if (parsedUser.role === UserRole.ADMIN) {
-        setMissions(allMissions);
-        setAllUsers(allDbUsers);
+        const allMissions = await db.getMissions();
+        const allDbUsers = await db.getUsers();
+
+        if (parsedUser.role === UserRole.ADMIN) {
+          setMissions(allMissions);
+          setAllUsers(allDbUsers);
+        } else {
+          setMissions(allMissions.filter(m => [MissionStatus.SCHEDULED, MissionStatus.RECRUITING, MissionStatus.ACTIVE, MissionStatus.COMPLETED].includes(m.status)));
+        }
       } else {
-        setMissions(allMissions.filter(m => [MissionStatus.SCHEDULED, MissionStatus.RECRUITING, MissionStatus.ACTIVE, MissionStatus.COMPLETED].includes(m.status)));
+        navigate('/login');
       }
-    } else {
-      navigate('/login');
-    }
+    };
+    loadData();
   }, [navigate]);
 
   const isAdmin = user?.role === UserRole.ADMIN;
@@ -72,11 +75,21 @@ const DashboardScreen: React.FC = () => {
     return Math.round(((user.missions_won || 0) / user.total_missions) * 100);
   }
   
+  const [teams, setTeams] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadTeams = async () => {
+      const allTeams = await db.getTeams();
+      setTeams(allTeams);
+    };
+    loadTeams();
+  }, []);
+
   const getPlayerTeam = (missionId: string) => {
-      const teams = db.getTeams().filter(t => t.mission_id === missionId);
-      const alpha = teams.find(t => t.team_name === 'alpha' && t.members.some(m => m.email === user?.email));
+      const missionTeams = teams.filter(t => t.mission_id === missionId);
+      const alpha = missionTeams.find(t => t.team_name === 'alpha' && t.members.some((m: any) => m.email === user?.email));
       if (alpha) return 'alpha';
-      const beta = teams.find(t => t.team_name === 'beta' && t.members.some(m => m.email === user?.email));
+      const beta = missionTeams.find(t => t.team_name === 'beta' && t.members.some((m: any) => m.email === user?.email));
       if (beta) return 'beta';
       return null;
   }

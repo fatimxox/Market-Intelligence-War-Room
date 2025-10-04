@@ -10,17 +10,22 @@ const MyCareerScreen = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('war-room-user');
-    if (storedUser) {
-        const currentUser: User = JSON.parse(storedUser);
-        setUser(currentUser);
-        
-        const userTeams = db.getTeams().filter(t => t.members.some(m => m.email === currentUser.email));
-        const userMissionIds = userTeams.map(t => t.mission_id);
-        const history = db.getMissions().filter(m => userMissionIds.includes(m.id));
-        setMissionHistory(history);
-    }
-    setLoading(false);
+    const loadData = async () => {
+        const storedUser = localStorage.getItem('war-room-user');
+        if (storedUser) {
+            const currentUser: User = JSON.parse(storedUser);
+            setUser(currentUser);
+
+            const allTeams = await db.getTeams();
+            const userTeams = allTeams.filter(t => t.members.some((m: any) => m.email === currentUser.email));
+            const userMissionIds = userTeams.map(t => t.mission_id);
+            const allMissions = await db.getMissions();
+            const history = allMissions.filter(m => userMissionIds.includes(m.id));
+            setMissionHistory(history);
+        }
+        setLoading(false);
+    };
+    loadData();
   }, []);
 
   const getWinRate = () => {

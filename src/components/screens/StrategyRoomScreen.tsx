@@ -44,14 +44,17 @@ const StrategyRoomScreen: React.FC = () => {
     const [dropTarget, setDropTarget] = useState<string | null>(null);
 
     useEffect(() => {
-        const user = JSON.parse(localStorage.getItem('war-room-user') || '{}');
-        setCurrentUser(user);
+        const loadData = async () => {
+            const user = JSON.parse(localStorage.getItem('war-room-user') || '{}');
+            setCurrentUser(user);
 
-        const foundMission = db.getMissions().find(m => m.id === missionId);
-        const foundTeam = db.getTeams().find(t => t.mission_id === missionId && t.team_name === teamName);
+            const allMissions = await db.getMissions();
+            const allTeams = await db.getTeams();
+            const foundMission = allMissions.find(m => m.id === missionId);
+            const foundTeam = allTeams.find(t => t.mission_id === missionId && t.team_name === teamName);
 
-        setMission(foundMission || null);
-        setTeam(foundTeam || null);
+            setMission(foundMission || null);
+            setTeam(foundTeam || null);
 
         if (foundTeam) {
             const initialAssignments: Record<string, PlayerAssignment> = {};
@@ -67,6 +70,8 @@ const StrategyRoomScreen: React.FC = () => {
             setRoleAssignments(initialAssignments);
             setAvailableMembers(unassignedMembers);
         }
+        };
+        loadData();
     }, [missionId, teamName]);
 
     const isLeader = currentUser?.email === team?.team_leader_email;
@@ -109,17 +114,16 @@ const StrategyRoomScreen: React.FC = () => {
         setDropTarget(null);
     };
     
-    const launchMission = () => {
+    const launchMission = async () => {
         if (!isLeader || !team) return;
-        // Save assignments to the DB
         const updatedMembers = team.members.map(m => {
             const assignedRole = Object.keys(roleAssignments).find(role => roleAssignments[role].email === m.email);
             return { ...m, battle_role: (assignedRole as BattleRole) || null };
         });
         const updatedTeam = { ...team, members: updatedMembers };
-        const allTeams = db.getTeams();
+        const allTeams = await db.getTeams();
         const finalTeams = allTeams.map(t => t.id === updatedTeam.id ? updatedTeam : t);
-        db.updateTeams(finalTeams);
+        await db.updateTeams(finalTeams);
 
         navigate(`/war-room/${missionId}/${teamName}`);
     };

@@ -1,101 +1,262 @@
-import { MOCK_DB } from '../constants.ts';
-import { User, Mission, Team, Report, MissionStatus } from '../types.ts';
+import { createClient } from '@supabase/supabase-js';
+import { User, Mission, Team, Report, MissionStatus } from '../types';
 
-const DB_KEY = 'intel_wars_db';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const getDb = () => {
-  try {
-    const dbString = localStorage.getItem(DB_KEY);
-    if (dbString) {
-      const parsed = JSON.parse(dbString);
-      // Basic validation to ensure the stored data has the expected structure
-      if (parsed.users && parsed.missions && parsed.teams) {
-        return parsed;
-      }
-    }
-  } catch (e) {
-    console.error("Failed to parse DB from localStorage, resetting.", e);
-    // If parsing fails, remove the corrupted item to avoid future errors
-    localStorage.removeItem(DB_KEY);
-  }
-  
-  // Initialize if not present or corrupt, and set mock passwords for login
-  const initialDb = { ...MOCK_DB };
-  initialDb.users.forEach(user => { user.password = '123'; });
-  localStorage.setItem(DB_KEY, JSON.stringify(initialDb));
-  return initialDb;
-};
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables');
+}
 
-const saveDb = (db: any) => {
-  localStorage.setItem(DB_KEY, JSON.stringify(db));
-};
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export const db = {
-  // READ
-  getUsers: (): User[] => getDb().users,
-  getMissions: (): Mission[] => {
-    const currentDb = getDb();
-    const now = new Date();
-    let missionsUpdated = false;
+  getUsers: async (): Promise<User[]> => {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-    const updatedMissions = currentDb.missions.map((mission: Mission) => {
-      if (mission.status === MissionStatus.SCHEDULED && mission.mission_start_time && new Date(mission.mission_start_time) <= now) {
-        missionsUpdated = true;
-        return { ...mission, status: MissionStatus.RECRUITING };
+    if (error) {
+      console.error('Error fetching users:', error);
+      return [];
+    }
+
+    return (data || []).map(user => ({
+      id: user.id,
+      displayName: user.display_name,
+      email: user.email,
+      role: user.role,
+      avatarUrl: user.avatar_url,
+      total_missions: user.total_missions,
+      missions_won: user.missions_won,
+      preferred_battle_role: user.preferred_battle_role,
+    }));
+  },
+
+  getMissions: async (): Promise<Mission[]> => {
+    const { data, error } = await supabase
+      .from('missions')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching missions:', error);
+      return [];
+    }
+
+    const now = new Date();
+    const missionsToUpdate: Mission[] = [];
+
+    const missions = (data || []).map(mission => {
+      const mappedMission: Mission = {
+        id: mission.id,
+        title: mission.title,
+        target_company: mission.target_company,
+        description: mission.description,
+        max_players_per_team: mission.max_players_per_team,
+        time_limit_minutes: mission.time_limit_minutes,
+        status: mission.status,
+        created_by_admin: mission.created_by_admin,
+        mission_start_time: mission.mission_start_time,
+        winner_team: mission.winner_team,
+        team_alpha_score: mission.team_alpha_score,
+        team_beta_score: mission.team_beta_score,
+        score_details: mission.score_details,
+      };
+
+      if (
+        mappedMission.status === MissionStatus.SCHEDULED &&
+        mappedMission.mission_start_time &&
+        new Date(mappedMission.mission_start_time) <= now
+      ) {
+        mappedMission.status = MissionStatus.RECRUITING;
+        missionsToUpdate.push(mappedMission);
       }
-      return mission;
+
+      return mappedMission;
     });
 
-    if (missionsUpdated) {
-      currentDb.missions = updatedMissions;
-      saveDb(currentDb);
+    for (const mission of missionsToUpdate) {
+      await supabase
+        .from('missions')
+        .update({ status: mission.status })
+        .eq('id', mission.id);
     }
-    
-    return updatedMissions;
-  },
-  getTeams: (): Team[] => getDb().teams,
-  getReports: (): Report[] => getDb().reports || [],
-  
-  // WRITE
-  addUser: (user: User) => {
-    const currentDb = getDb();
-    currentDb.users.push(user);
-    saveDb(currentDb);
-  },
-  
-  addMission: (mission: Mission) => {
-    const currentDb = getDb();
-    currentDb.missions.unshift(mission); // Add to top
-    saveDb(currentDb);
+
+    return missions;
   },
 
-  addReport: (report: Report) => {
-    const currentDb = getDb();
-    if (!currentDb.reports) {
-      currentDb.reports = [];
+  getTeams: async (): Promise<Team[]> => {
+    const { data, error } = await supabase
+      .from('teams')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching teams:', error);
+      return [];
     }
-    currentDb.reports.push(report);
-    saveDb(currentDb);
+
+    return (data || []).map(team => ({
+      id: team.id,
+      mission_id: team.mission_id,
+      team_name: team.team_name,
+      team_leader_email: team.team_leader_email,
+      members: team.members,
+      report_submitted: team.report_submitted,
+      submission_timestamp: team.submission_timestamp,
+    }));
   },
 
-  updateMissions: (missions: Mission[]) => {
-      const currentDb = getDb();
-      currentDb.missions = missions;
-      saveDb(currentDb);
-  },
-  
-  updateTeams: (teams: Team[]) => {
-      const currentDb = getDb();
-      currentDb.teams = teams;
-      saveDb(currentDb);
+  getReports: async (): Promise<Report[]> => {
+    const { data, error } = await supabase
+      .from('reports')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching reports:', error);
+      return [];
+    }
+
+    return (data || []).map(report => ({
+      id: report.id,
+      mission_id: report.mission_id,
+      team_name: report.team_name,
+      battle_data: report.battle_data,
+    }));
   },
 
-  updateUser: (updatedUser: User) => {
-    const currentDb = getDb();
-    const index = currentDb.users.findIndex((u: User) => u.id === updatedUser.id);
-    if (index !== -1) {
-      currentDb.users[index] = { ...currentDb.users[index], ...updatedUser };
-      saveDb(currentDb);
+  addUser: async (user: User): Promise<void> => {
+    const { error } = await supabase
+      .from('users')
+      .insert({
+        id: user.id,
+        email: user.email,
+        display_name: user.displayName,
+        role: user.role,
+        avatar_url: user.avatarUrl,
+        total_missions: user.total_missions || 0,
+        missions_won: user.missions_won || 0,
+        preferred_battle_role: user.preferred_battle_role,
+      });
+
+    if (error) {
+      console.error('Error adding user:', error);
+      throw error;
     }
-  }
+  },
+
+  addMission: async (mission: Mission): Promise<void> => {
+    const { error } = await supabase
+      .from('missions')
+      .insert({
+        id: mission.id,
+        title: mission.title,
+        target_company: mission.target_company,
+        description: mission.description,
+        max_players_per_team: mission.max_players_per_team,
+        time_limit_minutes: mission.time_limit_minutes,
+        status: mission.status,
+        created_by_admin: mission.created_by_admin,
+        mission_start_time: mission.mission_start_time,
+        winner_team: mission.winner_team,
+        team_alpha_score: mission.team_alpha_score,
+        team_beta_score: mission.team_beta_score,
+        score_details: mission.score_details,
+      });
+
+    if (error) {
+      console.error('Error adding mission:', error);
+      throw error;
+    }
+  },
+
+  addReport: async (report: Report): Promise<void> => {
+    const { error } = await supabase
+      .from('reports')
+      .upsert({
+        id: report.id,
+        mission_id: report.mission_id,
+        team_name: report.team_name,
+        battle_data: report.battle_data,
+      }, {
+        onConflict: 'mission_id,team_name'
+      });
+
+    if (error) {
+      console.error('Error adding report:', error);
+      throw error;
+    }
+  },
+
+  updateMissions: async (missions: Mission[]): Promise<void> => {
+    for (const mission of missions) {
+      const { error } = await supabase
+        .from('missions')
+        .update({
+          title: mission.title,
+          target_company: mission.target_company,
+          description: mission.description,
+          max_players_per_team: mission.max_players_per_team,
+          time_limit_minutes: mission.time_limit_minutes,
+          status: mission.status,
+          created_by_admin: mission.created_by_admin,
+          mission_start_time: mission.mission_start_time,
+          winner_team: mission.winner_team,
+          team_alpha_score: mission.team_alpha_score,
+          team_beta_score: mission.team_beta_score,
+          score_details: mission.score_details,
+        })
+        .eq('id', mission.id);
+
+      if (error) {
+        console.error('Error updating mission:', error);
+        throw error;
+      }
+    }
+  },
+
+  updateTeams: async (teams: Team[]): Promise<void> => {
+    for (const team of teams) {
+      const { error } = await supabase
+        .from('teams')
+        .upsert({
+          id: team.id,
+          mission_id: team.mission_id,
+          team_name: team.team_name,
+          team_leader_email: team.team_leader_email,
+          members: team.members,
+          report_submitted: team.report_submitted,
+          submission_timestamp: team.submission_timestamp,
+        }, {
+          onConflict: 'id'
+        });
+
+      if (error) {
+        console.error('Error updating team:', error);
+        throw error;
+      }
+    }
+  },
+
+  updateUser: async (updatedUser: User): Promise<void> => {
+    const { error } = await supabase
+      .from('users')
+      .update({
+        display_name: updatedUser.displayName,
+        role: updatedUser.role,
+        avatar_url: updatedUser.avatarUrl,
+        total_missions: updatedUser.total_missions,
+        missions_won: updatedUser.missions_won,
+        preferred_battle_role: updatedUser.preferred_battle_role,
+      })
+      .eq('id', updatedUser.id);
+
+    if (error) {
+      console.error('Error updating user:', error);
+      throw error;
+    }
+  },
 };

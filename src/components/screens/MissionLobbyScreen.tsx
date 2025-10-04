@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { User, Team, Mission, PlayerAssignment } from '../../types.ts';
 import Card from '../ui/Card.tsx';
 import Button from '../ui/Button.tsx';
-import { Crown, Users, ChevronRight } from '../icons.tsx';
+import { Crown, ChevronRight } from '../icons.tsx';
 import { db } from '../../lib/db.ts';
 
 const MissionLobbyScreen: React.FC = () => {
@@ -17,15 +17,16 @@ const MissionLobbyScreen: React.FC = () => {
     const [teamBeta, setTeamBeta] = useState<Team | null>(null);
     const [lastUpdated, setLastUpdated] = useState(Date.now());
 
-    const refreshData = useCallback(() => {
+    const refreshData = useCallback(async () => {
         if (!missionId) return;
         const user = JSON.parse(localStorage.getItem('war-room-user') || '{}');
         setCurrentUser(user);
-        
-        const foundMission = db.getMissions().find(m => m.id === missionId);
+
+        const allMissions = await db.getMissions();
+        const foundMission = allMissions.find(m => m.id === missionId);
         setMission(foundMission || null);
 
-        const allTeams = db.getTeams();
+        const allTeams = await db.getTeams();
         setTeamAlpha(allTeams.find(t => t.mission_id === missionId && t.team_name === 'alpha') || null);
         setTeamBeta(allTeams.find(t => t.mission_id === missionId && t.team_name === 'beta') || null);
     }, [missionId]);
@@ -34,10 +35,10 @@ const MissionLobbyScreen: React.FC = () => {
         refreshData();
     }, [missionId, lastUpdated, refreshData]);
     
-    const handleTeamAction = (teamName: 'alpha' | 'beta', action: 'join' | 'leader') => {
+    const handleTeamAction = async (teamName: 'alpha' | 'beta', action: 'join' | 'leader') => {
         if (!currentUser || !mission) return;
 
-        let allTeams = [...db.getTeams()];
+        let allTeams = [...(await db.getTeams())];
 
         if (action === 'join') {
             // When joining, first remove the user from any team they might be on for this mission.
@@ -81,7 +82,7 @@ const MissionLobbyScreen: React.FC = () => {
             }
         }
 
-        db.updateTeams(allTeams);
+        await db.updateTeams(allTeams);
         setLastUpdated(Date.now());
     };
     

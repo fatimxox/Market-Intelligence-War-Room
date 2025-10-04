@@ -255,7 +255,7 @@ const WarRoomScreen: React.FC = () => {
 
     // --- MAIN COMPONENT LOGIC ---
 
-    const handleSubmitReport = useCallback(() => {
+    const handleSubmitReport = useCallback(async () => {
         if (!mission || !team || team.report_submitted) return;
 
         const newReport: Report = {
@@ -264,27 +264,27 @@ const WarRoomScreen: React.FC = () => {
             team_name: team.team_name,
             battle_data: intelligenceData,
         };
-        db.addReport(newReport);
-        
+        await db.addReport(newReport);
+
         if (missionId && teamName) {
             localStorage.removeItem(`war_room_data_${missionId}_${teamName}`);
         }
 
-        const allTeams = db.getTeams();
-        const updatedTeams = allTeams.map(t => 
+        const allTeams = await db.getTeams();
+        const updatedTeams = allTeams.map(t =>
             t.id === team.id ? { ...t, report_submitted: true, submission_timestamp: new Date().toISOString() } : t
         );
-        db.updateTeams(updatedTeams);
+        await db.updateTeams(updatedTeams);
 
         const otherTeam = updatedTeams.find(t => t.mission_id === mission.id && t.team_name !== team.team_name);
         if (otherTeam?.report_submitted) {
-            const allMissions = db.getMissions();
-            const updatedMissions = allMissions.map(m => 
+            const allMissions = await db.getMissions();
+            const updatedMissions = allMissions.map(m =>
                 m.id === mission.id ? { ...m, status: MissionStatus.EVALUATION } : m
             );
-            db.updateMissions(updatedMissions);
+            await db.updateMissions(updatedMissions);
         }
-        
+
         setConfirmSubmitModalOpen(false);
         navigate(`/mission-results/${missionId}`);
     }, [mission, team, intelligenceData, navigate, missionId, teamName]);
@@ -331,18 +331,22 @@ const WarRoomScreen: React.FC = () => {
     }, [mission, team, isLeader, handleSubmitReport]);
 
     useEffect(() => {
-        const user = JSON.parse(localStorage.getItem('war-room-user') || '{}');
-        setCurrentUser(user);
-        
-        const foundMission = db.getMissions().find(m => m.id === missionId);
-        const foundTeam = db.getTeams().find(t => t.mission_id === missionId && t.team_name === teamName);
-        setMission(foundMission || null);
-        setTeam(foundTeam || null);
+        const loadData = async () => {
+            const user = JSON.parse(localStorage.getItem('war-room-user') || '{}');
+            setCurrentUser(user);
 
-        if (foundMission && teamName) {
-            const finalReport = db.getReports().find(r => r.mission_id === missionId && r.team_name === teamName);
-            if (finalReport) {
-                setIntelligenceData(finalReport.battle_data);
+            const allMissions = await db.getMissions();
+            const allTeams = await db.getTeams();
+            const foundMission = allMissions.find(m => m.id === missionId);
+            const foundTeam = allTeams.find(t => t.mission_id === missionId && t.team_name === teamName);
+            setMission(foundMission || null);
+            setTeam(foundTeam || null);
+
+            if (foundMission && teamName) {
+                const allReports = await db.getReports();
+                const finalReport = allReports.find(r => r.mission_id === missionId && r.team_name === teamName);
+                if (finalReport) {
+                    setIntelligenceData(finalReport.battle_data);
             } else {
                 const storageKey = `war_room_data_${missionId}_${teamName}`;
                 const savedData = localStorage.getItem(storageKey);
@@ -358,18 +362,19 @@ const WarRoomScreen: React.FC = () => {
                 setIntelligenceData(data);
             }
         }
-        
+
         if (user && foundTeam) {
-            const userInTeam = foundTeam.members.find(m => m.email === user.email);
+            const userInTeam = foundTeam.members.find((m: PlayerAssignment) => m.email === user.email);
             setUserRole(userInTeam?.battle_role || null);
         }
 
-        if (missionId && teamName) {
-            const chatKey = `war_room_chat_${missionId}_${teamName}`;
-            const savedChat = localStorage.getItem(chatKey);
-            if (savedChat) setChatMessages(JSON.parse(savedChat));
-        }
-
+            if (missionId && teamName) {
+                const chatKey = `war_room_chat_${missionId}_${teamName}`;
+                const savedChat = localStorage.getItem(chatKey);
+                if (savedChat) setChatMessages(JSON.parse(savedChat));
+            }
+        };
+        loadData();
     }, [missionId, teamName]);
 
     // Handle data saving to localStorage

@@ -15,7 +15,7 @@ const RegisterScreen: React.FC = () => {
     const [error, setError] = useState('');
     const navigate = useNavigate();
 
-    const handleRegister = (e: React.FormEvent) => {
+    const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
 
@@ -29,8 +29,9 @@ const RegisterScreen: React.FC = () => {
             setError('Please enter a valid email address.');
             return;
         }
-        
-        if (db.getUsers().some(u => u.email.toLowerCase() === email.toLowerCase())) {
+
+        const users = await db.getUsers();
+        if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
             setError('An account with this email already exists.');
             return;
         }
@@ -39,15 +40,19 @@ const RegisterScreen: React.FC = () => {
             id: `user-${Date.now()}`,
             displayName,
             email,
-            password, // In a real app, this should be hashed.
+            password,
             role: UserRole.PLAYER,
             total_missions: 0,
             missions_won: 0,
         };
 
-        db.addUser(newUser);
-        localStorage.setItem('war-room-user', JSON.stringify(newUser));
-        navigate('/dashboard');
+        try {
+            await db.addUser(newUser);
+            localStorage.setItem('war-room-user', JSON.stringify(newUser));
+            navigate('/dashboard');
+        } catch (error) {
+            setError('Failed to create account. Please try again.');
+        }
     };
     
     const formVariants = {

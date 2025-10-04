@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { User } from "../../types";
 import Card from "../ui/Card";
 import Input from "../ui/Input";
@@ -11,9 +11,12 @@ const UsersScreen = () => {
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
-    const usersFromDb = db.getUsers();
-    setAllUsers(usersFromDb);
-    setFilteredUsers(usersFromDb);
+    const loadUsers = async () => {
+        const usersFromDb = await db.getUsers();
+        setAllUsers(usersFromDb);
+        setFilteredUsers(usersFromDb);
+    };
+    loadUsers();
   }, []);
 
   useEffect(() => {
